@@ -33,12 +33,12 @@ export function calcularCotizacion(
     descuentoGlobalPct: number;
     descuentoGlobalMonto: number;
     clienteEsRetenedorIva: boolean;
-    parametros: ParametrosFiscales;
+    parametros: ParametrosFiscales | null | undefined;
   }
 ): ResultadoFiscal {
   const { descuentoGlobalPct, descuentoGlobalMonto, clienteEsRetenedorIva, parametros } = opts;
 
-  const subtotalBruto = lineas.reduce((acc, l) => acc + l.cantidad * l.precio_unitario, 0);
+  const subtotalBruto = lineas.reduce((acc, l) => acc + (l.cantidad || 0) * (l.precio_unitario || 0), 0);
   const descuentoLineas = lineas.reduce((acc, l) => acc + (l.descuento_linea_monto || 0), 0);
   const subtotalNeto = subtotalBruto - descuentoLineas;
 
@@ -47,12 +47,20 @@ export function calcularCotizacion(
     : (descuentoGlobalMonto || 0);
 
   const baseGravable = Math.max(subtotalNeto - descuentoGlobal, 0);
-  const ivaMonto = round2(baseGravable * parametros.iva_porcentaje);
+  
+  // Blindado contra parametros nulos:
+  const ivaPorcentaje = parametros?.iva_porcentaje ?? 0.12;
+  const ivaMonto = round2(baseGravable * ivaPorcentaje);
   const totalCotizado = baseGravable + ivaMonto;
 
-  const isrRetencion = baseGravable <= parametros.isr_tramo1_limite
-    ? round2(baseGravable * parametros.isr_tramo1_porcentaje)
-    : round2((baseGravable - parametros.isr_tramo1_limite) * parametros.isr_tramo2_porcentaje + parametros.isr_tramo2_fijo);
+  const isrTramo1Limite = parametros?.isr_tramo1_limite ?? 30000;
+  const isrTramo1Porcentaje = parametros?.isr_tramo1_porcentaje ?? 0.05;
+  const isrTramo2Porcentaje = parametros?.isr_tramo2_porcentaje ?? 0.07;
+  const isrTramo2Fijo = parametros?.isr_tramo2_fijo ?? 1500;
+
+  const isrRetencion = baseGravable <= isrTramo1Limite
+    ? round2(baseGravable * isrTramo1Porcentaje)
+    : round2((baseGravable - isrTramo1Limite) * isrTramo2Porcentaje + isrTramo2Fijo);
 
   const ivaRetencion = clienteEsRetenedorIva ? round2(ivaMonto * 0.12) : 0;
   const pagoNetoEmpresa = totalCotizado - isrRetencion - ivaRetencion;
@@ -60,6 +68,8 @@ export function calcularCotizacion(
   const porcentajeDescuentoEfectivo = subtotalBruto > 0
     ? round3(((descuentoLineas + descuentoGlobal) / subtotalBruto) * 100)
     : 0;
+
+  const umbralAutorizacion = parametros?.descuento_umbral_autorizacion ?? 0.10;
 
   return {
     subtotalBruto: round2(subtotalBruto),
@@ -73,7 +83,7 @@ export function calcularCotizacion(
     ivaRetencion,
     pagoNetoEmpresa: round2(pagoNetoEmpresa),
     porcentajeDescuentoEfectivo,
-    requiereAutorizacion: porcentajeDescuentoEfectivo > parametros.descuento_umbral_autorizacion * 100,
+    requiereAutorizacion: porcentajeDescuentoEfectivo > umbralAutorizacion * 100,
   };
 }
 
