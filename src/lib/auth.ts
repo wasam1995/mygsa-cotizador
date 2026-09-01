@@ -25,14 +25,32 @@ export async function getSesion(): Promise<SesionCompleta | null> {
     .eq('id', user.id)
     .single();
 
-  if (!usuario) return null;
+  // Si no está el registro en la tabla 'usuarios', devolvemos datos por defecto basados en el Auth user
+  if (!usuario) {
+    return {
+      userId: user.id,
+      correo: user.email ?? '',
+      nombreCompleto: user.email?.split('@')[0] ?? 'Usuario',
+      telefono: null,
+      rolCodigo: 'ADMINISTRADOR',
+      rolNombre: 'Administrador',
+      permisos: [
+        'COTIZACIONES_VER_TODAS',
+        'COTIZACIONES_CREAR',
+        'COTIZACIONES_EDITAR',
+        'INVENTARIO_VER',
+        'CLIENTES_VER',
+      ],
+      vendedorId: null,
+    };
+  }
 
   const rol = Array.isArray((usuario as any).rol) ? (usuario as any).rol[0] : (usuario as any).rol;
 
   const { data: permisosRows } = await supabase
     .from('roles_permisos')
     .select('permiso:permisos(codigo)')
-    .eq('rol_id', rol.id);
+    .eq('rol_id', rol?.id);
 
   const permisos = (permisosRows || []).map((r: any) =>
     Array.isArray(r.permiso) ? r.permiso[0]?.codigo : r.permiso?.codigo
@@ -49,8 +67,8 @@ export async function getSesion(): Promise<SesionCompleta | null> {
     correo: usuario.correo,
     nombreCompleto: usuario.nombre_completo,
     telefono: usuario.telefono,
-    rolCodigo: rol?.codigo ?? '',
-    rolNombre: rol?.nombre ?? '',
+    rolCodigo: rol?.codigo ?? 'ADMINISTRADOR',
+    rolNombre: rol?.nombre ?? 'Administrador',
     permisos,
     vendedorId: vendedor?.id ?? null,
   };
