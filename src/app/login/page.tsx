@@ -1,12 +1,9 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import { loginAction } from './actions';
 
-// useSearchParams() obliga a envolver en Suspense para que Next.js pueda prerenderizar
-// el resto de la página estáticamente (de lo contrario falla el build de producción).
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
@@ -16,27 +13,21 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const supabase = createClient();
-
-  const [correo, setCorreo] = useState('');
-  const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setCargando(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email: correo, password });
-    setCargando(false);
-    if (error) {
-      setError('Correo o contraseña incorrectos.');
-      return;
+
+    const formData = new FormData(e.currentTarget);
+    const res = await loginAction(formData);
+
+    if (res?.error) {
+      setError(res.error);
+      setCargando(false);
     }
-    
-    window.location.href = params.get('next') || '/dashboard';
   }
 
   return (
@@ -62,18 +53,23 @@ function LoginForm() {
           <div className="mb-4">
             <label className="label">Correo electrónico</label>
             <input
-              type="email" required autoFocus value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              className="input" placeholder="vendedor@mygsa.com.gt"
+              name="email"
+              type="email"
+              required
+              autoFocus
+              className="input"
+              placeholder="vendedor@mygsa.com.gt"
             />
           </div>
 
           <div className="mb-2">
             <label className="label">Contraseña</label>
             <input
-              type="password" required value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input" placeholder="••••••••"
+              name="password"
+              type="password"
+              required
+              className="input"
+              placeholder="••••••••"
             />
           </div>
 
