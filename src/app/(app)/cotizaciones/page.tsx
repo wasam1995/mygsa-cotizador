@@ -21,6 +21,7 @@ export default async function CotizacionesPage({
   let query = supabase.from('cotizaciones')
     .select('*, cliente:clientes(nombre_razon), vendedor:vendedores(nombre_completo)')
     .order('creado_en', { ascending: false });
+
   if (!verTodas && sesion.vendedorId) query = query.eq('vendedor_id', sesion.vendedorId);
 
   const { data } = await query.limit(400);
@@ -29,9 +30,6 @@ export default async function CotizacionesPage({
     vendedor: { nombre_completo: string } | null;
   })[];
 
-  // "Pendientes de terminar": borradores activos (no anulados/facturados) que aún no
-  // tienen capturado el número de cotización del sistema ERP externo — sin ese dato no
-  // se pueden finalizar (enviar/autorizar/facturar), así que necesitan volver a atenderse.
   const pendientesFinalizar = listaCompleta.filter((c) =>
     !['FACTURADO', 'ANULADO'].includes(c.estado) && (!c.numero_sistema_externo || !c.numero_sistema_externo.trim())
   );
@@ -65,6 +63,7 @@ export default async function CotizacionesPage({
         </div>
         <span className="rounded-full bg-amber-500 px-3 py-1 text-sm font-bold text-white">{pendientesFinalizar.length}</span>
       </Link>
+
       {soloPendientes && (
         <p className="mb-4">
           <Link href="?vista=bandejas" className="text-xs font-semibold text-navy-600 hover:underline">← Ver todas las bandejas</Link>
@@ -89,9 +88,9 @@ export default async function CotizacionesPage({
                 <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="py-2.5 pr-3"><Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">{c.numero_interno}</Link></td>
                   <td className="py-2.5 pr-3 text-slate-500">{formatFecha(c.fecha_emision)}</td>
-                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</td>
-                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo}</td>
-                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado)}</td>
+                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '—'}</td>
+                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo ?? '—'}</td>
+                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado ?? 0)}</td>
                   <td className="py-2.5 pr-3"><StatusBadge estado={c.estado} /></td>
                 </tr>
               ))}
@@ -113,12 +112,12 @@ export default async function CotizacionesPage({
                   {items.map((c) => (
                     <Link key={c.id} href={`/cotizaciones/${c.id}`} className="card block !p-3 hover:border-navy-300">
                       <p className="text-sm font-bold text-navy-700">{c.numero_interno}</p>
-                      <p className="truncate text-xs text-slate-500">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</p>
+                      <p className="truncate text-xs text-slate-500">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '—'}</p>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-700">{formatQ(c.total_cotizado)}</span>
+                        <span className="text-sm font-semibold text-slate-700">{formatQ(c.total_cotizado ?? 0)}</span>
                         <span className="text-[11px] text-slate-400">{formatFecha(c.fecha_emision)}</span>
                       </div>
-                      {verTodas && <p className="mt-1 text-[11px] text-slate-400">{c.vendedor?.nombre_completo}</p>}
+                      {verTodas && <p className="mt-1 text-[11px] text-slate-400">{c.vendedor?.nombre_completo ?? '—'}</p>}
                     </Link>
                   ))}
                   {items.length === 0 && <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-300">Vacío</p>}
@@ -145,12 +144,13 @@ export default async function CotizacionesPage({
                 <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="py-2.5 pr-3"><Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">{c.numero_interno}</Link></td>
                   <td className="py-2.5 pr-3 text-slate-500">{formatFecha(c.fecha_emision)}</td>
-                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</td>
-                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo}</td>
-                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado)}</td>
+                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '—'}</td>
+                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo ?? '—'}</td>
+                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado ?? 0)}</td>
                   <td className="py-2.5 pr-3"><StatusBadge estado={c.estado} /></td>
                 </tr>
               ))}
+              {lista.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-slate-400">No hay cotizaciones para mostrar.</td></tr>}
             </tbody>
           </table>
         </div>
