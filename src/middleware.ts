@@ -39,17 +39,19 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
-
   const path = request.nextUrl.pathname
 
-  // Redirigir a login si intenta entrar a cualquier ruta protegida sin sesión
-  if (!session && path !== '/login' && !path.startsWith('/auth')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // Permitir la ruta raíz, login y rutas públicas explícitamente sin redirección automática
+  if (path === '/' || path === '/login' || path.startsWith('/auth')) {
+    if (session && (path === '/' || path === '/login')) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return response
   }
 
-  // Redirigir a dashboard si ya tiene sesión activa e intenta ir al login
-  if (session && path === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Proteger cualquier otra ruta si no hay sesión
+  if (!session) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response
@@ -58,7 +60,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
-
-export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/public|.*\\.(?:png|jpg|jpeg|svg|ico)$).*)'],
-};
