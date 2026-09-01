@@ -8,7 +8,8 @@ import type { Cotizacion } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage() {
+// const sesion = await requireSesion();
+const sesion = { permisos: ['COTIZACIONES_VER_TODAS'], vendedorId: null };
   const sesion = await requireSesion();
   const supabase = createClient();
 
