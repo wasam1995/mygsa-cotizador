@@ -8,14 +8,19 @@ import type { Cotizacion } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-// const sesion = await requireSesion();
-const sesion = { permisos: ['COTIZACIONES_VER_TODAS'], vendedorId: null };
+export default async function DashboardPage() {
   const sesion = await requireSesion();
   const supabase = createClient();
 
   const verTodas = sesion.permisos.includes('COTIZACIONES_VER_TODAS');
-  let query = supabase.from('cotizaciones').select('*, cliente:clientes(nombre_razon)').order('creado_en', { ascending: false });
-  if (!verTodas && sesion.vendedorId) query = query.eq('vendedor_id', sesion.vendedorId);
+  let query = supabase
+    .from('cotizaciones')
+    .select('*, cliente:clientes(nombre_razon)')
+    .order('creado_en', { ascending: false });
+
+  if (!verTodas && sesion.vendedorId) {
+    query = query.eq('vendedor_id', sesion.vendedorId);
+  }
 
   const { data: cotizaciones } = await query.limit(200);
   const lista = (cotizaciones ?? []) as (Cotizacion & { cliente: { nombre_razon: string } | null })[];
@@ -23,15 +28,19 @@ const sesion = { permisos: ['COTIZACIONES_VER_TODAS'], vendedorId: null };
   const activos = lista.filter((c) => !['FACTURADO', 'ANULADO'].includes(c.estado));
   const pendAutorizar = lista.filter((c) => c.estado === 'PEND_AUTORIZAR');
   const facturadas = lista.filter((c) => c.estado === 'FACTURADO');
-  const totalFacturado = facturadas.reduce((a, c) => a + Number(c.base_gravable), 0);
+  const totalFacturado = facturadas.reduce((a, c) => a + Number(c.base_gravable || 0), 0);
   const recientes = lista.slice(0, 8);
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard titulo="Cotizaciones activas" valor={String(activos.length)} tono="navy" />
-        <StatCard titulo="Pend. de autorización" valor={String(pendAutorizar.length)} tono="orange"
-          subtitulo={pendAutorizar.length > 0 ? 'Descuento mayor al 5%' : undefined} />
+        <StatCard 
+          titulo="Pend. de autorización" 
+          valor={String(pendAutorizar.length)} 
+          tono="orange"
+          subtitulo={pendAutorizar.length > 0 ? 'Descuento mayor al 5%' : undefined} 
+        />
         <StatCard titulo="Facturadas" valor={String(facturadas.length)} tono="green" />
         <StatCard titulo="Base gravable facturada" valor={formatQ(totalFacturado)} tono="green" />
       </div>
@@ -67,7 +76,9 @@ const sesion = { permisos: ['COTIZACIONES_VER_TODAS'], vendedorId: null };
                 </tr>
               ))}
               {recientes.length === 0 && (
-                <tr><td colSpan={5} className="py-8 text-center text-slate-400">Aún no hay cotizaciones.</td></tr>
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">Aún no hay cotizaciones.</td>
+                </tr>
               )}
             </tbody>
           </table>
