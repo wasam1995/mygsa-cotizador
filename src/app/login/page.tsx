@@ -35,8 +35,8 @@ function LoginForm() {
       setError('Correo o contraseña incorrectos.');
       return;
     }
-    router.replace(params.get('next') || '/dashboard');
-    router.refresh();
+    
+    window.location.href = params.get('next') || '/dashboard';
   }
 
   return (
