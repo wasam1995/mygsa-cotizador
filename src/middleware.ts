@@ -1,9 +1,12 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-// Refresca la sesión de Supabase en cada request y protege las rutas del panel.
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,38 +14,49 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         get(name: string) {
-          return request.cookies.get(name)?.value;
+          return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
+          request.cookies.set({ name, value, ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
+          request.cookies.set({ name, value, ...options, maxAge: 0 })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({ name, value, ...options, maxAge: 0 })
         },
       },
     }
-  );
+  )
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession()
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-    || request.nextUrl.pathname.startsWith('/reset-password')
-    || request.nextUrl.pathname.startsWith('/auth');
+  const path = request.nextUrl.pathname
 
-  if (!user && !isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.searchParams.set('next', request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+  // Redirigir a login si intenta entrar a cualquier ruta protegida sin sesión
+  if (!session && path !== '/login' && !path.startsWith('/auth')) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+  // Redirigir a dashboard si ya tiene sesión activa e intenta ir al login
+  if (session && path === '/login') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return response;
+  return response
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
 
 export const config = {
