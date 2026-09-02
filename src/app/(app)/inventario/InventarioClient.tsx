@@ -1,10 +1,24 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatQ } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/client';
 import { actualizarProducto, crearProducto, registrarEntradaInventario } from './actions';
 import type { Producto } from '@/lib/types';
+
+// Sube una foto de producto al bucket público "productos" y devuelve su URL pública.
+async function subirFotoProducto(archivo: File): Promise<string> {
+  const supabase = createClient();
+  const ext = archivo.name.split('.').pop() || 'jpg';
+  const ruta = `producto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from('productos').upload(ruta, archivo, {
+    upsert: true, contentType: archivo.type || undefined,
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from('productos').getPublicUrl(ruta);
+  return data.publicUrl;
+}
 
 export default function InventarioClient({ productos, puedeEditar }: { productos: Producto[]; puedeEditar: boolean }) {
   const router = useRouter();
@@ -74,6 +88,24 @@ function FilaProducto({
   const [cantEntrada, setCantEntrada] = useState(0);
   const [comentEntrada, setComentEntrada] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  const fotoRef = useRef<HTMLInputElement>(null);
+
+  async function handleFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setErrorFoto(null);
+    setSubiendoFoto(true);
+    try {
+      setImagenUrl(await subirFotoProducto(archivo));
+    } catch (err) {
+      setErrorFoto(err instanceof Error ? err.message : 'No se pudo subir la foto.');
+    } finally {
+      setSubiendoFoto(false);
+      if (fotoRef.current) fotoRef.current.value = '';
+    }
+  }
 
   return (
     <>
@@ -107,7 +139,18 @@ function FilaProducto({
             <div className="flex flex-wrap items-end gap-3">
               <div><label className="label">Costo unitario</label><input type="number" step="0.01" className="input w-32" value={costo} onChange={(e) => setCosto(Number(e.target.value))} /></div>
               <div><label className="label">Precio lista</label><input type="number" step="0.01" className="input w-32" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} /></div>
-              <div className="min-w-[220px] flex-1"><label className="label">URL de imagen (opcional)</label><input className="input" placeholder="https://…" value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} /></div>
+              <div className="min-w-[260px] flex-1">
+                <label className="label">Foto del producto</label>
+                <div className="flex items-center gap-2">
+                  {imagenUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imagenUrl} alt="" className="h-9 w-9 flex-shrink-0 rounded object-cover" />
+                  )}
+                  <input ref={fotoRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFoto} className="input" disabled={subiendoFoto} />
+                </div>
+                {subiendoFoto && <p className="mt-0.5 text-xs text-slate-400">Subiendo…</p>}
+                {errorFoto && <p className="mt-0.5 text-xs text-red-600">{errorFoto}</p>}
+              </div>
               <div className="min-w-[220px] flex-1"><label className="label">Especificaciones (opcional)</label><input className="input" placeholder="Medidas, material, etc." value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} /></div>
               <button disabled={guardando} className="btn btn-primary" onClick={async () => {
                 setGuardando(true);
@@ -155,6 +198,21 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
   const [especificaciones, setEspecificaciones] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  async function handleFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setError(null);
+    setSubiendoFoto(true);
+    try {
+      setImagenUrl(await subirFotoProducto(archivo));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir la foto.');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  }
 
   return (
     <div className="card border-navy-200 bg-navy-50/40">
@@ -167,7 +225,16 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
         <input type="number" step="0.01" className="input" placeholder="Costo" value={costo} onChange={(e) => setCosto(Number(e.target.value))} />
         <input type="number" step="0.01" className="input" placeholder="Precio lista" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} />
         <input type="number" step="1" className="input" placeholder="Stock inicial" value={stock} onChange={(e) => setStock(Number(e.target.value))} />
-        <input className="input sm:col-span-2" placeholder="URL de imagen (opcional)" value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} />
+        <div className="sm:col-span-2">
+          <div className="flex items-center gap-2">
+            {imagenUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imagenUrl} alt="" className="h-9 w-9 flex-shrink-0 rounded object-cover" />
+            )}
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFoto} className="input" disabled={subiendoFoto} />
+          </div>
+          {subiendoFoto && <p className="mt-0.5 text-xs text-slate-400">Subiendo foto…</p>}
+        </div>
         <input className="input" placeholder="Especificaciones (opcional)" value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} />
       </div>
       <div className="mt-3 flex gap-2">
