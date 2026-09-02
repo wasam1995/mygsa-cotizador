@@ -98,6 +98,24 @@ export interface ParametrosFiscales {
   empresa_es_retenedor_iva: boolean;
   leyenda_cotizacion: string;
   margen_sugerido_defecto: number;
+  // Personalización visual (Etapa 4)
+  logo_url: string | null;
+  color_primario: string;
+  color_acento: string;
+  color_acento_oscuro: string;
+  color_fondo: string;
+  color_fondo_alterno: string;
+  color_borde: string;
+  tipografia: string;
+}
+
+export interface PlantillaCotizacion {
+  id: string;
+  nombre: string;
+  condiciones_comerciales: string;
+  leyenda_pie: string;
+  es_predeterminada: boolean;
+  activo: boolean;
 }
 
 export interface Cotizacion {
@@ -153,6 +171,8 @@ export interface Cotizacion {
   prorratear_costos_operativos: boolean;
   mostrar_precios_unitarios_cliente: boolean;
   mostrar_vendedor_cliente: boolean;
+  // Plantilla de condiciones comerciales (Etapa 4)
+  plantilla_id: string | null;
 }
 
 export type ModoPrecioLinea = 'FIJO' | 'COSTO_MARGEN';
