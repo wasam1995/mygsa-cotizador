@@ -1,9 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { actualizarEscalaComision, actualizarParametros } from './actions';
 import type { EscalaComision, ParametrosFiscales } from '@/lib/types';
+
+const FUENTES = [
+  { valor: 'Inter, ui-sans-serif, system-ui, sans-serif', etiqueta: 'Inter (moderna, por defecto)' },
+  { valor: 'Arial, Helvetica, sans-serif', etiqueta: 'Arial' },
+  { valor: 'Georgia, "Times New Roman", serif', etiqueta: 'Georgia (clásica/serif)' },
+  { valor: '"Courier New", Courier, monospace', etiqueta: 'Courier New (técnica)' },
+  { valor: '"Trebuchet MS", sans-serif', etiqueta: 'Trebuchet MS' },
+];
 
 export default function ParametrosClient({ parametros, escalasComision }: { parametros: ParametrosFiscales; escalasComision: EscalaComision[] }) {
   const router = useRouter();
@@ -11,12 +20,38 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const logoRef = useRef<HTMLInputElement>(null);
 
   const [escalas, setEscalas] = useState<EscalaComision[]>(escalasComision);
   const [guardandoEscalas, setGuardandoEscalas] = useState(false);
 
   function set<K extends keyof ParametrosFiscales>(key: K, value: ParametrosFiscales[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setError(null);
+    setSubiendoLogo(true);
+    try {
+      const supabase = createClient();
+      const ext = archivo.name.split('.').pop() || 'png';
+      const ruta = `logo_${Date.now()}.${ext}`;
+      const { error: errSubida } = await supabase.storage.from('logos').upload(ruta, archivo, {
+        upsert: true,
+        contentType: archivo.type || undefined,
+      });
+      if (errSubida) throw errSubida;
+      const { data } = supabase.storage.from('logos').getPublicUrl(ruta);
+      set('logo_url', data.publicUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo subir el logotipo.');
+    } finally {
+      setSubiendoLogo(false);
+      if (logoRef.current) logoRef.current.value = '';
+    }
   }
 
   function setEscala(rango: number, patch: Partial<EscalaComision>) {
@@ -167,12 +202,67 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
 
       <div className="card">
         <h2 className="mb-3 text-sm font-bold text-slate-700">Leyenda impresa en la cotización</h2>
+        <p className="mb-2 text-xs text-slate-400">
+          Se usa como respaldo solo cuando la cotización no tiene una plantilla asignada. Para la leyenda y las condiciones comerciales que se imprimen normalmente, use el módulo <b>Plantillas</b>.
+        </p>
         <textarea className="input min-h-[100px]" value={form.leyenda_cotizacion} onChange={(e) => set('leyenda_cotizacion', e.target.value)} />
+      </div>
+
+      <div className="card">
+        <h2 className="mb-1 text-sm font-bold text-slate-700">Personalización visual</h2>
+        <p className="mb-3 text-xs text-slate-400">
+          Logotipo, colores corporativos y tipografía usados en las cotizaciones impresas / PDF (versión cliente e interna).
+        </p>
+
+        <div className="mb-4 flex items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            {form.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.logo_url} alt="Logotipo" className="h-full w-full object-contain" />
+            ) : (
+              <span className="text-xs text-slate-400">Sin logo</span>
+            )}
+          </div>
+          <div>
+            <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoChange} className="input" disabled={subiendoLogo} />
+            <p className="mt-1 text-xs text-slate-400">{subiendoLogo ? 'Subiendo…' : 'PNG, JPG, SVG o WEBP. Fondo transparente recomendado.'}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ColorCampo label="Primario" hint="Títulos, cabeceras" value={form.color_primario} onChange={(v) => set('color_primario', v)} />
+          <ColorCampo label="Acento" hint="Bordes destacados, tabla" value={form.color_acento} onChange={(v) => set('color_acento', v)} />
+          <ColorCampo label="Acento oscuro" hint="Totales, llamadas de atención" value={form.color_acento_oscuro} onChange={(v) => set('color_acento_oscuro', v)} />
+          <ColorCampo label="Fondo general" hint="Bloques de datos" value={form.color_fondo} onChange={(v) => set('color_fondo', v)} />
+          <ColorCampo label="Fondo alterno" hint="Totales / alertas" value={form.color_fondo_alterno} onChange={(v) => set('color_fondo_alterno', v)} />
+          <ColorCampo label="Bordes" hint="Líneas divisorias" value={form.color_borde} onChange={(v) => set('color_borde', v)} />
+        </div>
+
+        <div className="mt-3">
+          <Campo label="Tipografía">
+            <select className="input" value={form.tipografia} onChange={(e) => set('tipografia', e.target.value)}>
+              {FUENTES.map((f) => <option key={f.valor} value={f.valor}>{f.etiqueta}</option>)}
+            </select>
+          </Campo>
+        </div>
       </div>
 
       <button disabled={guardando} className="btn btn-orange" onClick={guardar}>
         {guardando ? 'Guardando…' : 'Guardar parámetros'}
       </button>
+    </div>
+  );
+}
+
+function ColorCampo({ label, hint, value, onChange }: { label: string; hint?: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="flex items-center gap-2">
+        <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-slate-200 p-0.5" />
+        <input className="input" value={value} onChange={(e) => onChange(e.target.value)} />
+      </div>
+      {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }
