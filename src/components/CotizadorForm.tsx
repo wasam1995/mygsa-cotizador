@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProductPicker from './ProductPicker';
-import { calcularCotizacion, numeroALetras, precioPorMargen } from '@/lib/fiscal';
+import { calcularCotizacion, distribuirCostosOperativosPorLinea, numeroALetras, precioPorMargen } from '@/lib/fiscal';
 import { formatQ, esTelefonoGuatemalaValido, normalizarTelefonoGuatemala } from '@/lib/utils';
-import type { Cliente, EscalaComision, ModoPrecioLinea, ParametrosFiscales, Producto, Vendedor } from '@/lib/types';
+import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ModoPrecioLinea, ParametrosFiscales, Producto, Vendedor } from '@/lib/types';
 import { crearCotizacion, type CostoOperativoPayload, type LineaPayload } from '@/app/(app)/cotizaciones/nueva/actions';
+import { actualizarCotizacionCompleta } from '@/app/(app)/cotizaciones/[id]/actions';
 
 interface LineaEstado extends LineaPayload {
   key: string;
@@ -23,7 +24,7 @@ const nuevaKey = () => `L${Date.now()}_${contadorKey++}`;
 const CONCEPTOS_SUGERIDOS = ['Hospedaje', 'Viáticos', 'Combustible', 'Mano de obra', 'Instalación'];
 
 export default function CotizadorForm({
-  vendedores, clientes, productos, parametros, escalasComision, esVendedorFijo, vendedorInicial,
+  vendedores, clientes, productos, parametros, escalasComision, esVendedorFijo, vendedorInicial, cotizacionExistente,
 }: {
   vendedores: Vendedor[];
   clientes: Cliente[];
@@ -32,27 +33,60 @@ export default function CotizadorForm({
   escalasComision: EscalaComision[];
   esVendedorFijo: boolean;
   vendedorInicial: Vendedor | null;
+  cotizacionExistente?: {
+    cotizacion: Cotizacion;
+    lineas: CotizacionDetalle[];
+    costosOperativos: CotizacionCostoOperativo[];
+  };
 }) {
   const router = useRouter();
+  const cotOriginal = cotizacionExistente?.cotizacion ?? null;
+  const modoEdicion = !!cotOriginal;
 
-  const [vendedorId, setVendedorId] = useState(vendedorInicial?.id ?? '');
-  const [vendedorTelefono, setVendedorTelefono] = useState(vendedorInicial?.telefono ?? '');
+  const [vendedorId, setVendedorId] = useState(cotOriginal?.vendedor_id ?? vendedorInicial?.id ?? '');
+  const [vendedorTelefono, setVendedorTelefono] = useState(cotOriginal?.vendedor_telefono ?? vendedorInicial?.telefono ?? '');
 
-  const [clienteModo, setClienteModo] = useState<'catalogo' | 'libre'>('catalogo');
-  const [clienteId, setClienteId] = useState('');
-  const [clienteLibreNombre, setClienteLibreNombre] = useState('Consumidor Final');
-  const [clienteLibreNit, setClienteLibreNit] = useState('');
-  const [clienteLibreDireccion, setClienteLibreDireccion] = useState('');
-  const [clienteLibreTelefono, setClienteLibreTelefono] = useState('');
-  const [clienteEsRetenedorIva, setClienteEsRetenedorIva] = useState(false);
+  const [clienteModo, setClienteModo] = useState<'catalogo' | 'libre'>(cotOriginal?.cliente_id ? 'catalogo' : cotOriginal ? 'libre' : 'catalogo');
+  const [clienteId, setClienteId] = useState(cotOriginal?.cliente_id ?? '');
+  const [clienteLibreNombre, setClienteLibreNombre] = useState(cotOriginal?.cliente_nombre_libre ?? 'Consumidor Final');
+  const [clienteLibreNit, setClienteLibreNit] = useState(cotOriginal?.cliente_nit ?? '');
+  const [clienteLibreDireccion, setClienteLibreDireccion] = useState(cotOriginal?.cliente_direccion ?? '');
+  const [clienteLibreTelefono, setClienteLibreTelefono] = useState(cotOriginal?.cliente_telefono ?? '');
+  const [clienteEsRetenedorIva, setClienteEsRetenedorIva] = useState(cotOriginal?.cliente_es_retenedor_iva ?? false);
 
-  const [numeroSistemaExterno, setNumeroSistemaExterno] = useState('');
-  const [comentario, setComentario] = useState('');
-  const [descuentoGlobalPct, setDescuentoGlobalPct] = useState(0);
-  const [descuentoGlobalMonto, setDescuentoGlobalMonto] = useState(0);
+  const [numeroSistemaExterno, setNumeroSistemaExterno] = useState(cotOriginal?.numero_sistema_externo ?? '');
+  const [comentario, setComentario] = useState(cotOriginal?.comentario ?? '');
+  const [descuentoGlobalPct, setDescuentoGlobalPct] = useState(cotOriginal?.descuento_global_pct ?? 0);
+  const [descuentoGlobalMonto, setDescuentoGlobalMonto] = useState(cotOriginal?.descuento_global_monto ?? 0);
 
-  const [lineas, setLineas] = useState<LineaEstado[]>([]);
-  const [costosOperativos, setCostosOperativos] = useState<CostoOperativoEstado[]>([]);
+  const [prorratearCostosOperativos, setProrratearCostosOperativos] = useState(cotOriginal?.prorratear_costos_operativos ?? false);
+  const [mostrarPreciosUnitariosCliente, setMostrarPreciosUnitariosCliente] = useState(cotOriginal?.mostrar_precios_unitarios_cliente ?? true);
+  const [mostrarVendedorCliente, setMostrarVendedorCliente] = useState(cotOriginal?.mostrar_vendedor_cliente ?? true);
+
+  const [lineas, setLineas] = useState<LineaEstado[]>(() => (cotizacionExistente?.lineas ?? []).map((l) => {
+    const prod = l.producto_id ? productos.find((p) => p.id === l.producto_id) : null;
+    return {
+      key: nuevaKey(),
+      producto_id: l.producto_id,
+      es_fuera_inventario: l.es_fuera_inventario,
+      codigo_mostrado: l.codigo_mostrado ?? '',
+      descripcion: l.descripcion,
+      cantidad: Number(l.cantidad),
+      costo_unitario: Number(l.costo_unitario),
+      precio_unitario: Number(l.precio_unitario),
+      descuento_linea_pct: Number(l.descuento_linea_pct),
+      descuento_linea_monto: Number(l.descuento_linea_monto),
+      modo_precio: l.modo_precio,
+      margen_pct: l.margen_pct,
+      incluir_foto: l.incluir_foto,
+      // se le vuelve a sumar lo que esta misma línea ya tenía reservado, para no marcar
+      // "excede stock" solo por estar editando una cotización que ya reservó esa cantidad.
+      stockDisponible: prod ? prod.stock_actual - prod.stock_reservado + Number(l.cantidad) : null,
+    };
+  }));
+  const [costosOperativos, setCostosOperativos] = useState<CostoOperativoEstado[]>(() => (cotizacionExistente?.costosOperativos ?? []).map((c) => ({
+    key: nuevaKey(), concepto: c.concepto, cantidad: Number(c.cantidad), dias: Number(c.dias), costo_unitario: Number(c.costo_unitario),
+  })));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [vistaInterna, setVistaInterna] = useState(true);
@@ -75,6 +109,7 @@ export default function CotizadorForm({
       descuento_linea_monto: 0,
       modo_precio: 'FIJO',
       margen_pct: margenSugerido,
+      incluir_foto: false,
       stockDisponible: p.stock_actual - p.stock_reservado,
     }]);
   }
@@ -93,6 +128,7 @@ export default function CotizadorForm({
       descuento_linea_monto: 0,
       modo_precio: 'FIJO',
       margen_pct: margenSugerido,
+      incluir_foto: false,
       stockDisponible: null,
     }]);
   }
@@ -140,6 +176,11 @@ export default function CotizadorForm({
     costosOperativos, escalasComision,
   }), [lineas, descuentoGlobalPct, descuentoGlobalMonto, clienteEsRetenedorIva, parametros, costosOperativos, escalasComision]);
 
+  const prorrateoPorLinea = useMemo(
+    () => distribuirCostosOperativosPorLinea(lineas, calculo.costosOperativosTotal),
+    [lineas, calculo.costosOperativosTotal]
+  );
+
   const totalEnLetras = numeroALetras(calculo.totalCotizado);
 
   async function guardar(finalizando: boolean) {
@@ -157,7 +198,7 @@ export default function CotizadorForm({
     }
 
     setGuardando(true);
-    const resultado = await crearCotizacion({
+    const payload = {
       vendedor_id: vendedorId,
       vendedor_telefono: vendedorTelefono ? normalizarTelefonoGuatemala(vendedorTelefono) : '',
       cliente_id: clienteModo === 'catalogo' ? clienteId : null,
@@ -170,9 +211,16 @@ export default function CotizadorForm({
       descuento_global_monto: descuentoGlobalMonto,
       comentario: comentario || null,
       numero_sistema_externo: numeroSistemaExterno || null,
+      prorratear_costos_operativos: prorratearCostosOperativos,
+      mostrar_precios_unitarios_cliente: mostrarPreciosUnitariosCliente,
+      mostrar_vendedor_cliente: mostrarVendedorCliente,
       lineas: lineas.map(({ key, stockDisponible, ...l }) => l),
       costos_operativos: costosOperativos.map(({ key, ...c }) => c),
-    });
+    };
+
+    const resultado = modoEdicion
+      ? await actualizarCotizacionCompleta(cotOriginal!.id, payload)
+      : await crearCotizacion(payload);
     setGuardando(false);
     if (resultado?.error) setError(resultado.error);
   }
@@ -297,7 +345,7 @@ export default function CotizadorForm({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] text-sm">
+          <table className="w-full min-w-[1120px] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
                 <th className="py-2 pr-2">Código</th>
@@ -308,6 +356,7 @@ export default function CotizadorForm({
                 <th className="py-2 pr-2 w-28">Precio U. (c/IVA)</th>
                 <th className="py-2 pr-2 w-20">Desc. %</th>
                 <th className="py-2 pr-2 w-28">Subtotal</th>
+                <th className="py-2 pr-2 w-16 text-center">Foto</th>
                 <th className="w-8"></th>
               </tr>
             </thead>
@@ -315,6 +364,7 @@ export default function CotizadorForm({
               {lineas.map((l) => {
                 const subtotalLinea = round2(l.cantidad * l.precio_unitario - l.descuento_linea_monto);
                 const excedeStock = l.stockDisponible !== null && l.cantidad > l.stockDisponible;
+                const producto = l.producto_id ? productos.find((p) => p.id === l.producto_id) : null;
                 return (
                   <tr key={l.key} className="border-b border-slate-100 align-top last:border-0">
                     <td className="py-2 pr-2">
@@ -367,6 +417,11 @@ export default function CotizadorForm({
                              onChange={(e) => actualizarLinea(l.key, { descuento_linea_pct: Number(e.target.value) })} />
                     </td>
                     <td className="py-2 pr-2 font-semibold text-slate-700">{formatQ(subtotalLinea)}</td>
+                    <td className="py-2 pr-2 text-center">
+                      <input type="checkbox" checked={l.incluir_foto} disabled={!producto?.imagen_url}
+                             title={producto?.imagen_url ? 'Incluir la foto de este producto en la cotización' : 'Este producto no tiene foto cargada en Inventario'}
+                             onChange={(e) => actualizarLinea(l.key, { incluir_foto: e.target.checked })} />
+                    </td>
                     <td className="py-2 text-right">
                       <button type="button" onClick={() => eliminarLinea(l.key)} className="text-slate-400 hover:text-red-600">✕</button>
                     </td>
@@ -374,7 +429,7 @@ export default function CotizadorForm({
                 );
               })}
               {lineas.length === 0 && (
-                <tr><td colSpan={9} className="py-8 text-center text-slate-400">Busque un producto del inventario o agregue uno fuera de inventario.</td></tr>
+                <tr><td colSpan={10} className="py-8 text-center text-slate-400">Busque un producto del inventario o agregue uno fuera de inventario.</td></tr>
               )}
             </tbody>
           </table>
@@ -436,9 +491,31 @@ export default function CotizadorForm({
             </table>
           </div>
         )}
-        <div className="mt-2 flex justify-end text-sm font-bold text-slate-700">
-          Total gastos operativos adicionales: {formatQ(calculo.costosOperativosTotal)}
+        <div className="mt-2 flex items-center justify-between">
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            <input type="checkbox" checked={prorratearCostosOperativos} onChange={(e) => setProrratearCostosOperativos(e.target.checked)} />
+            Prorratear estos costos entre los productos de la tabla (solo para la vista interna; no cambia la utilidad total)
+          </label>
+          <span className="text-sm font-bold text-slate-700">
+            Total gastos operativos adicionales: {formatQ(calculo.costosOperativosTotal)}
+          </span>
         </div>
+
+        {prorratearCostosOperativos && costosOperativos.length > 0 && lineas.length > 0 && (
+          <div className="mt-3 overflow-x-auto rounded-lg bg-slate-50 p-3">
+            <p className="mb-2 text-xs font-semibold text-slate-600">Distribución de costos operativos por producto (proporcional a su venta):</p>
+            <table className="w-full min-w-[420px] text-xs">
+              <tbody>
+                {lineas.map((l, idx) => (
+                  <tr key={l.key} className="border-b border-slate-200 last:border-0">
+                    <td className="py-1 pr-2 text-slate-600">{l.descripcion || l.codigo_mostrado}</td>
+                    <td className="py-1 pr-2 text-right font-medium text-slate-700">{formatQ(prorrateoPorLinea[idx] ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Descuentos y resumen */}
@@ -469,6 +546,21 @@ export default function CotizadorForm({
         </div>
       </div>
 
+      {/* Qué ve el cliente */}
+      <div className="card">
+        <h2 className="mb-3 text-sm font-bold text-slate-700">Qué ve el cliente</h2>
+        <div className="flex flex-col gap-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={mostrarPreciosUnitariosCliente} onChange={(e) => setMostrarPreciosUnitariosCliente(e.target.checked)} />
+            Mostrar precio unitario por línea (si se desmarca, la vista del cliente solo muestra un precio total del paquete)
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={mostrarVendedorCliente} onChange={(e) => setMostrarVendedorCliente(e.target.checked)} />
+            Mostrar el nombre del vendedor en la vista del cliente
+          </label>
+        </div>
+      </div>
+
       <div className="card">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-700">Resumen</h2>
@@ -486,11 +578,17 @@ export default function CotizadorForm({
 
         {!vistaInterna ? (
           <dl className="max-w-md space-y-1.5 text-sm">
-            <Fila label="Subtotal (con IVA)" valor={calculo.subtotalBruto} />
-            <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
+            {mostrarPreciosUnitariosCliente ? (
+              <>
+                <Fila label="Subtotal (con IVA)" valor={calculo.subtotalBruto} />
+                <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
+              </>
+            ) : (
+              <p className="text-xs text-slate-400">Se mostrará un solo precio de paquete (sin desglose por línea).</p>
+            )}
             <Fila label="Total a pagar (incluye IVA)" valor={calculo.totalCotizado} negrita grande />
             <hr className="my-2 border-slate-200" />
-            <p className="text-xs text-slate-400">Esta es la información que ve el cliente: sin costos, márgenes ni comisiones.</p>
+            <p className="text-xs text-slate-400">Esta es la información que ve el cliente: sin costos, márgenes ni comisiones{!mostrarVendedorCliente ? ', ni el nombre del vendedor' : ''}.</p>
           </dl>
         ) : (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -524,9 +622,12 @@ export default function CotizadorForm({
                 <Fila label="Comisión estimada a pagar" valor={calculo.comisionEstimadaMonto} tono="text-amber-700" />
                 <hr className="my-2 border-slate-200" />
                 <Fila label="Ganancia neta estimada para la empresa" valor={calculo.gananciaNetaEstimada} negrita grande tono="text-emerald-700" />
-                {calculo.escala?.observacion && (
-                  <p className="mt-1 text-xs text-slate-400">{calculo.escala.observacion}</p>
-                )}
+                <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs leading-relaxed text-slate-500">
+                  Explicación: la utilidad bruta ({formatQ(calculo.utilidadBruta)}) representa el {(calculo.margenUtilidadPct * 100).toFixed(2)}% del total cotizado.
+                  Ese % cae en el <b>Rango {calculo.escala?.rango ?? '—'}</b> de la escala de comisiones (Parámetros), que paga <b>{(calculo.comisionEstimadaPct * 100).toFixed(2)}%</b> sobre
+                  la utilidad bruta → {formatQ(calculo.utilidadBruta)} × {(calculo.comisionEstimadaPct * 100).toFixed(2)}% = <b>{formatQ(calculo.comisionEstimadaMonto)}</b> de comisión.
+                  {calculo.escala?.observacion ? ` (${calculo.escala.observacion})` : ''}
+                </p>
               </dl>
             </div>
           </div>
@@ -534,13 +635,21 @@ export default function CotizadorForm({
       </div>
 
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:flex-row sm:justify-end lg:-mx-8 lg:px-8">
-        <button type="button" onClick={() => router.push('/cotizaciones')} className="btn btn-ghost">Cancelar</button>
-        <button type="button" disabled={guardando} onClick={() => guardar(false)} className="btn btn-secondary">
-          Guardar borrador
-        </button>
-        <button type="button" disabled={guardando} onClick={() => guardar(true)} className="btn btn-orange">
-          {guardando ? 'Guardando…' : 'Guardar y continuar'}
-        </button>
+        <button type="button" onClick={() => router.push(modoEdicion ? `/cotizaciones/${cotOriginal!.id}` : '/cotizaciones')} className="btn btn-ghost">Cancelar</button>
+        {modoEdicion ? (
+          <button type="button" disabled={guardando} onClick={() => guardar(true)} className="btn btn-orange">
+            {guardando ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        ) : (
+          <>
+            <button type="button" disabled={guardando} onClick={() => guardar(false)} className="btn btn-secondary">
+              Guardar borrador
+            </button>
+            <button type="button" disabled={guardando} onClick={() => guardar(true)} className="btn btn-orange">
+              {guardando ? 'Guardando…' : 'Guardar y continuar'}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

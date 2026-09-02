@@ -1,12 +1,14 @@
 import { formatQ, formatFecha } from '@/lib/utils';
 import type { Cotizacion, CotizacionDetalle, ParametrosFiscales } from '@/lib/types';
 
+type LineaConFoto = CotizacionDetalle & { producto?: { imagen_url: string | null } | null };
+
 export default function PrintQuote({
   cotizacion, lineas, parametros, clienteNombre, clienteNit, clienteDireccion, clienteContacto,
   vendedorNombre, vendedorCorreo,
 }: {
   cotizacion: Cotizacion;
-  lineas: CotizacionDetalle[];
+  lineas: LineaConFoto[];
   parametros: ParametrosFiscales;
   clienteNombre: string;
   clienteNit: string | null;
@@ -16,6 +18,8 @@ export default function PrintQuote({
   vendedorCorreo: string | null;
 }) {
   const anulada = cotizacion.estado === 'ANULADO';
+  const mostrarPrecios = cotizacion.mostrar_precios_unitarios_cliente;
+  const mostrarVendedor = cotizacion.mostrar_vendedor_cliente;
 
   return (
     <div className="print-area relative mx-auto max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-card print:rounded-none print:border-0 print:shadow-none">
@@ -34,7 +38,9 @@ export default function PrintQuote({
           <p className="text-xs text-slate-500">No. {cotizacion.numero_sistema_externo || cotizacion.numero_interno}</p>
           <p className="text-xs text-slate-500">Fecha: {formatFecha(cotizacion.fecha_emision)}</p>
           <p className="text-xs text-slate-500">Vence: {formatFecha(cotizacion.fecha_vencimiento)}</p>
-          <p className="text-xs text-slate-500">Vendedor: {vendedorNombre}</p>
+          {mostrarVendedor && (
+            <p className="text-xs text-slate-500">Vendedor: {vendedorNombre}</p>
+          )}
         </div>
       </div>
 
@@ -56,22 +62,38 @@ export default function PrintQuote({
         <thead>
           <tr className="border-b-2 border-brand-orange text-left uppercase text-slate-500">
             <th className="py-2">Artículo / servicio</th>
-            <th className="py-2 text-right">Precio</th>
+            {mostrarPrecios && <th className="py-2 text-right">Precio</th>}
             <th className="py-2 text-right">Cantidad</th>
-            <th className="py-2 text-right">Total</th>
+            {mostrarPrecios && <th className="py-2 text-right">Total</th>}
           </tr>
         </thead>
         <tbody>
-          {lineas.map((l) => (
-            <tr key={l.id} className="border-b border-slate-100">
-              <td className="py-2 pr-2">{l.descripcion}</td>
-              <td className="py-2 text-right">{formatQ(l.precio_unitario)}</td>
-              <td className="py-2 text-right">{l.cantidad}</td>
-              <td className="py-2 text-right font-medium">{formatQ(l.subtotal_linea)}</td>
-            </tr>
-          ))}
+          {lineas.map((l) => {
+            const foto = l.incluir_foto ? l.producto?.imagen_url : null;
+            return (
+              <tr key={l.id} className="border-b border-slate-100">
+                <td className="py-2 pr-2">
+                  <div className="flex items-center gap-2">
+                    {foto && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={foto} alt={l.descripcion} className="h-10 w-10 flex-shrink-0 rounded object-cover" />
+                    )}
+                    <span>{l.descripcion}</span>
+                  </div>
+                </td>
+                {mostrarPrecios && <td className="py-2 text-right">{formatQ(l.precio_unitario)}</td>}
+                <td className="py-2 text-right">{l.cantidad}</td>
+                {mostrarPrecios && <td className="py-2 text-right font-medium">{formatQ(l.subtotal_linea)}</td>}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      {!mostrarPrecios && (
+        <p className="mt-2 text-right text-[11px] italic text-slate-400">
+          Precios detallados por artículo omitidos — se muestra el precio total del paquete.
+        </p>
+      )}
 
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:justify-between">
         <div className="max-w-xs rounded-lg border-l-4 border-emerald-400 bg-emerald-50 p-3 text-xs">
