@@ -3,8 +3,20 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import type { ApartadoPlantilla } from '@/lib/types';
 
-export async function crearPlantilla(payload: { nombre: string; condiciones_comerciales: string; leyenda_pie: string }) {
+export interface PlantillaPayload {
+  nombre: string;
+  condiciones_comerciales: string;
+  leyenda_pie: string;
+  texto_institucional: string;
+  titulo_tabla_items: string;
+  texto_firma_emisor: string;
+  texto_firma_cliente: string;
+  apartados: ApartadoPlantilla[];
+}
+
+export async function crearPlantilla(payload: PlantillaPayload) {
   await requireSesion('PLANTILLAS_EDITAR');
   const supabase = createClient();
   if (!payload.nombre.trim()) return { error: 'El nombre es obligatorio.' };
@@ -17,7 +29,7 @@ export async function crearPlantilla(payload: { nombre: string; condiciones_come
   return { ok: true };
 }
 
-export async function actualizarPlantilla(id: string, payload: { nombre: string; condiciones_comerciales: string; leyenda_pie: string }) {
+export async function actualizarPlantilla(id: string, payload: PlantillaPayload) {
   await requireSesion('PLANTILLAS_EDITAR');
   const supabase = createClient();
   if (!payload.nombre.trim()) return { error: 'El nombre es obligatorio.' };
