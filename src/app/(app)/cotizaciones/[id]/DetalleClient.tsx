@@ -6,18 +6,19 @@ import PrintQuote from '@/components/PrintQuote';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
 import { cambiarEstado, subirPdfCotizacion, obtenerUrlAdjunto } from './actions';
-import type { Cotizacion, CotizacionAdjunto, CotizacionDetalle, CotizacionHistorialEstado, ParametrosFiscales } from '@/lib/types';
+import type { Cotizacion, CotizacionAdjunto, CotizacionCostoOperativo, CotizacionDetalle, CotizacionHistorialEstado, ParametrosFiscales } from '@/lib/types';
 
 type Tab = 'interno' | 'impresion';
 
 export default function DetalleClient({
-  cotizacion, lineas, historial, adjuntos, parametros, permisos, esCreador,
+  cotizacion, lineas, historial, adjuntos, costosOperativos, parametros, permisos, esCreador,
   clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
 }: {
   cotizacion: Cotizacion;
   lineas: CotizacionDetalle[];
   historial: CotizacionHistorialEstado[];
   adjuntos: CotizacionAdjunto[];
+  costosOperativos: CotizacionCostoOperativo[];
   parametros: ParametrosFiscales;
   permisos: string[];
   esCreador: boolean;
@@ -180,19 +181,60 @@ export default function DetalleClient({
             </table>
           </div>
 
+          {costosOperativos.length > 0 && (
+            <div className="card overflow-x-auto">
+              <h2 className="mb-3 text-sm font-bold text-slate-700">Costos operativos adicionales (uso interno)</h2>
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                    <th className="py-2 pr-2">Concepto</th><th className="py-2 pr-2">Cant.</th>
+                    <th className="py-2 pr-2">Días/tiempos</th><th className="py-2 pr-2">Costo unit.</th><th className="py-2 pr-2">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costosOperativos.map((c) => (
+                    <tr key={c.id} className="border-b border-slate-100 last:border-0">
+                      <td className="py-2 pr-2">{c.concepto}</td>
+                      <td className="py-2 pr-2">{c.cantidad}</td>
+                      <td className="py-2 pr-2">{c.dias}</td>
+                      <td className="py-2 pr-2">{formatQ(c.costo_unitario)}</td>
+                      <td className="py-2 pr-2 font-medium">{formatQ(c.cantidad * c.dias * c.costo_unitario)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <div className="card grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <h2 className="mb-2 text-sm font-bold text-slate-700">Resumen fiscal</h2>
-              <FilaResumen label="Subtotal" valor={cotizacion.subtotal} />
+              <FilaResumen label="Subtotal (con IVA)" valor={cotizacion.subtotal} />
               <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
-              <FilaResumen label="Base gravable" valor={cotizacion.base_gravable} negrita />
+              <FilaResumen label="Total cotizado (incluye IVA)" valor={cotizacion.total_cotizado} negrita grande />
+              <FilaResumen label="Base gravable (sin IVA)" valor={cotizacion.base_gravable} />
               <FilaResumen label="IVA (12%)" valor={cotizacion.iva_monto} />
-              <FilaResumen label="Total cotizado" valor={cotizacion.total_cotizado} negrita grande />
               <hr className="my-2" />
               <FilaResumen label="Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
               <FilaResumen label="Retención IVA" valor={-cotizacion.iva_retencion} tono="text-red-600" />
               <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita tono="text-emerald-700" />
             </div>
+            <div>
+              <h2 className="mb-2 text-sm font-bold text-slate-700">Utilidad y comisión (uso interno)</h2>
+              <FilaResumen label="Costo total de productos/servicios" valor={cotizacion.costo_total_productos} />
+              <FilaResumen label="+ Gastos operativos adicionales" valor={cotizacion.costos_operativos_total} />
+              <FilaResumen label="= Costo total de operación" valor={cotizacion.costo_total_operacion} negrita />
+              <FilaResumen label="Utilidad bruta" valor={cotizacion.utilidad_bruta} negrita tono="text-navy-700" />
+              <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>% Margen de utilidad</span><span className="font-semibold">{(cotizacion.margen_utilidad_pct * 100).toFixed(2)}%</span></div>
+              <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>Escala de comisión aplicada</span><span className="font-semibold">{cotizacion.escala_comision_rango ? `Rango ${cotizacion.escala_comision_rango}` : '—'}</span></div>
+              <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>% Comisión al vendedor</span><span className="font-semibold">{(cotizacion.comision_estimada_pct * 100).toFixed(2)}%</span></div>
+              <FilaResumen label="Comisión estimada / pagada" valor={cotizacion.comision_estimada_monto} tono="text-amber-700" />
+              <hr className="my-2" />
+              <FilaResumen label="Ganancia neta para la empresa" valor={cotizacion.ganancia_neta_estimada} negrita grande tono="text-emerald-700" />
+            </div>
+          </div>
+
+          <div className="card grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <h2 className="mb-2 text-sm font-bold text-slate-700">Adjuntos (PDF del ERP)</h2>
               <ul className="mb-3 space-y-1">
