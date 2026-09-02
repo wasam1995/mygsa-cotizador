@@ -98,6 +98,8 @@ export interface ParametrosFiscales {
   empresa_es_retenedor_iva: boolean;
   leyenda_cotizacion: string;
   margen_sugerido_defecto: number;
+  // Retención de IVA (Etapa 5) — antes 12% fijo en el código, ahora parametrizable.
+  retencion_iva_porcentaje: number;
   // Personalización visual (Etapa 4)
   logo_url: string | null;
   color_primario: string;
@@ -109,6 +111,11 @@ export interface ParametrosFiscales {
   tipografia: string;
 }
 
+export interface ApartadoPlantilla {
+  titulo: string;
+  contenido: string;
+}
+
 export interface PlantillaCotizacion {
   id: string;
   nombre: string;
@@ -116,6 +123,12 @@ export interface PlantillaCotizacion {
   leyenda_pie: string;
   es_predeterminada: boolean;
   activo: boolean;
+  // Plantilla completa (Etapa 5)
+  texto_institucional: string;
+  titulo_tabla_items: string;
+  texto_firma_emisor: string;
+  texto_firma_cliente: string;
+  apartados: ApartadoPlantilla[];
 }
 
 export interface Cotizacion {
@@ -162,6 +175,7 @@ export interface Cotizacion {
   costos_operativos_total: number;
   costo_total_operacion: number;
   utilidad_bruta: number;
+  utilidad_neta: number;
   margen_utilidad_pct: number;
   escala_comision_rango: number | null;
   comision_estimada_pct: number;

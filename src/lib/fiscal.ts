@@ -42,11 +42,12 @@ export interface ResultadoFiscal {
   costoTotalProductos: number;
   costosOperativosTotal: number;
   costoTotalOperacion: number;
-  utilidadBruta: number;
-  margenUtilidadPct: number; // fracción, ej 0.4571
+  utilidadBruta: number; // Venta Neta Base (SIN IVA) - costo de operación
+  utilidadNeta: number; // utilidadBruta - ISR — base real de la comisión (Etapa 5)
+  margenUtilidadPct: number; // fracción, ej 0.4571 — utilidadNeta / baseGravable
   escala: EscalaComision | null;
   comisionEstimadaPct: number; // fracción
-  comisionEstimadaMonto: number;
+  comisionEstimadaMonto: number; // sobre utilidadNeta
   gananciaNetaEstimada: number;
 }
 
@@ -80,24 +81,28 @@ export function calcularCotizacion(
     ? round2(baseGravable * parametros.isr_tramo1_porcentaje)
     : round2((baseGravable - parametros.isr_tramo1_limite) * parametros.isr_tramo2_porcentaje + parametros.isr_tramo2_fijo);
 
-  const ivaRetencion = clienteEsRetenedorIva ? round2(ivaMonto * 0.12) : 0;
+  const ivaRetencion = clienteEsRetenedorIva ? round2(ivaMonto * parametros.retencion_iva_porcentaje) : 0;
   const pagoNetoEmpresa = round2(totalCotizado - isrRetencion - ivaRetencion);
 
   const porcentajeDescuentoEfectivo = subtotalBruto > 0
     ? round3(((descuentoLineas + descuentoGlobal) / subtotalBruto) * 100)
     : 0;
 
-  // --- Resumen financiero interno ---------------------------------------------------
+  // --- Resumen financiero interno (Etapa 5: nuevo modelo) ----------------------------
+  // Utilidad Bruta = Venta Neta Base SIN IVA (baseGravable) - Costo total de operación.
+  // Utilidad Neta = Utilidad Bruta - ISR (fórmula obligatoria) — es la base real de la
+  // comisión y del % de margen que decide el rango de la escala.
   const costoTotalProductos = round2(lineas.reduce((acc, l) => acc + l.cantidad * l.costo_unitario, 0));
   const costosOperativosTotal = round2(costosOperativos.reduce((acc, c) => acc + c.cantidad * c.dias * c.costo_unitario, 0));
   const costoTotalOperacion = round2(costoTotalProductos + costosOperativosTotal);
-  const utilidadBruta = round2(totalCotizado - costoTotalOperacion);
-  const margenUtilidadPct = totalCotizado > 0 ? round4(utilidadBruta / totalCotizado) : 0;
+  const utilidadBruta = round2(baseGravable - costoTotalOperacion);
+  const utilidadNeta = round2(utilidadBruta - isrRetencion);
+  const margenUtilidadPct = baseGravable > 0 ? round4(utilidadNeta / baseGravable) : 0;
 
   const escala = buscarEscalaComision(margenUtilidadPct, escalasComision);
   const comisionEstimadaPct = escala?.porcentaje_comision ?? 0;
-  const comisionEstimadaMonto = round2(utilidadBruta * comisionEstimadaPct);
-  const gananciaNetaEstimada = round2(utilidadBruta - comisionEstimadaMonto);
+  const comisionEstimadaMonto = round2(utilidadNeta * comisionEstimadaPct);
+  const gananciaNetaEstimada = round2(utilidadNeta - comisionEstimadaMonto);
 
   return {
     subtotalBruto: round2(subtotalBruto),
@@ -111,11 +116,14 @@ export function calcularCotizacion(
     ivaRetencion,
     pagoNetoEmpresa,
     porcentajeDescuentoEfectivo,
-    requiereAutorizacion: porcentajeDescuentoEfectivo > parametros.descuento_umbral_autorizacion * 100,
+    // Requiere autorización si el descuento supera el umbral, O si la cotización cae en
+    // el Rango 1 de comisión (0%, "Requiere aprobación gerencial").
+    requiereAutorizacion: porcentajeDescuentoEfectivo > parametros.descuento_umbral_autorizacion * 100 || escala?.rango === 1,
     costoTotalProductos,
     costosOperativosTotal,
     costoTotalOperacion,
     utilidadBruta,
+    utilidadNeta,
     margenUtilidadPct,
     escala,
     comisionEstimadaPct,
