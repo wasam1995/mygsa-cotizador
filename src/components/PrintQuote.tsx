@@ -79,11 +79,10 @@ export default function PrintQuote({
           <p className="mt-1 italic text-emerald-700">{cotizacion.total_en_letras}</p>
         </div>
         <div className="w-full max-w-xs text-sm">
-          <div className="flex justify-between py-1"><span className="text-slate-500">Subtotal</span><span>{formatQ(cotizacion.subtotal)}</span></div>
+          <div className="flex justify-between py-1"><span className="text-slate-500">Subtotal (incluye IVA)</span><span>{formatQ(cotizacion.subtotal)}</span></div>
           <div className="flex justify-between py-1"><span className="text-slate-500">Descuento</span><span>{formatQ(cotizacion.total_descuentos)}</span></div>
-          <div className="flex justify-between py-1"><span className="text-slate-500">IVA (12%)</span><span>{formatQ(cotizacion.iva_monto)}</span></div>
           <div className="flex justify-between border-t border-slate-300 py-2 text-base font-bold text-brand-orangeDark">
-            <span>TOTAL</span><span>{formatQ(cotizacion.total_cotizado)}</span>
+            <span>TOTAL A PAGAR (incluye IVA)</span><span>{formatQ(cotizacion.total_cotizado)}</span>
           </div>
         </div>
       </div>
@@ -94,6 +93,21 @@ export default function PrintQuote({
           <p className="text-slate-500">{cotizacion.comentario}</p>
         </div>
       )}
+
+      <div className="mt-6 border-t border-slate-200 pt-4 text-xs text-slate-600">
+        <p className="mb-1 font-bold text-slate-700">CONDICIONES COMERCIALES</p>
+        <ol className="list-inside list-decimal space-y-0.5">
+          <li>Precios expresados en Quetzales (Q) e incluyen IVA ({(parametros.iva_porcentaje * 100).toFixed(0)}%).</li>
+          <li>Vigencia de esta cotización: {parametros.vigencia_dias} días a partir de la fecha de emisión (hasta {formatFecha(cotizacion.fecha_vencimiento)}).</li>
+          <li>Número de referencia de pedido / cotización: {cotizacion.numero_sistema_externo || cotizacion.numero_interno}.</li>
+          <li>Precios sujetos a cambio sin previo aviso una vez vencida la vigencia indicada.</li>
+        </ol>
+      </div>
+
+      <div className="mt-8 grid grid-cols-2 gap-8 text-center text-xs text-slate-500">
+        <div className="border-t border-slate-400 pt-2">Autorizado por (Asesor)</div>
+        <div className="border-t border-slate-400 pt-2">Aceptado por (Cliente / Fecha)</div>
+      </div>
 
       <div className="mt-6 border-t border-dashed border-slate-300 pt-4 text-center text-[11px] leading-relaxed text-slate-500">
         {parametros.leyenda_cotizacion}

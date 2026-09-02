@@ -3,26 +3,33 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProductPicker from './ProductPicker';
-import { calcularCotizacion, numeroALetras } from '@/lib/fiscal';
+import { calcularCotizacion, numeroALetras, precioPorMargen } from '@/lib/fiscal';
 import { formatQ, esTelefonoGuatemalaValido, normalizarTelefonoGuatemala } from '@/lib/utils';
-import type { Cliente, ParametrosFiscales, Producto, Vendedor } from '@/lib/types';
-import { crearCotizacion, type LineaPayload } from '@/app/(app)/cotizaciones/nueva/actions';
+import type { Cliente, EscalaComision, ModoPrecioLinea, ParametrosFiscales, Producto, Vendedor } from '@/lib/types';
+import { crearCotizacion, type CostoOperativoPayload, type LineaPayload } from '@/app/(app)/cotizaciones/nueva/actions';
 
 interface LineaEstado extends LineaPayload {
   key: string;
   stockDisponible: number | null;
 }
 
+interface CostoOperativoEstado extends CostoOperativoPayload {
+  key: string;
+}
+
 let contadorKey = 0;
 const nuevaKey = () => `L${Date.now()}_${contadorKey++}`;
 
+const CONCEPTOS_SUGERIDOS = ['Hospedaje', 'Viáticos', 'Combustible', 'Mano de obra', 'Instalación'];
+
 export default function CotizadorForm({
-  vendedores, clientes, productos, parametros, esVendedorFijo, vendedorInicial,
+  vendedores, clientes, productos, parametros, escalasComision, esVendedorFijo, vendedorInicial,
 }: {
   vendedores: Vendedor[];
   clientes: Cliente[];
   productos: Producto[];
   parametros: ParametrosFiscales;
+  escalasComision: EscalaComision[];
   esVendedorFijo: boolean;
   vendedorInicial: Vendedor | null;
 }) {
@@ -45,12 +52,16 @@ export default function CotizadorForm({
   const [descuentoGlobalMonto, setDescuentoGlobalMonto] = useState(0);
 
   const [lineas, setLineas] = useState<LineaEstado[]>([]);
+  const [costosOperativos, setCostosOperativos] = useState<CostoOperativoEstado[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vistaInterna, setVistaInterna] = useState(true);
 
   const clienteSeleccionado = clientes.find((c) => c.id === clienteId) || null;
+  const margenSugerido = parametros.margen_sugerido_defecto ?? 0.45;
 
   function agregarDesdeCatalogo(p: Producto) {
+    const costo = Number(p.costo_unitario);
     setLineas((prev) => [...prev, {
       key: nuevaKey(),
       producto_id: p.id,
@@ -58,10 +69,12 @@ export default function CotizadorForm({
       codigo_mostrado: p.codigo,
       descripcion: p.nombre + (p.color_variante ? ` (${p.color_variante})` : ''),
       cantidad: 1,
-      costo_unitario: Number(p.costo_unitario),
+      costo_unitario: costo,
       precio_unitario: Number(p.precio_lista),
       descuento_linea_pct: 0,
       descuento_linea_monto: 0,
+      modo_precio: 'FIJO',
+      margen_pct: margenSugerido,
       stockDisponible: p.stock_actual - p.stock_reservado,
     }]);
   }
@@ -78,6 +91,8 @@ export default function CotizadorForm({
       precio_unitario: 0,
       descuento_linea_pct: 0,
       descuento_linea_monto: 0,
+      modo_precio: 'FIJO',
+      margen_pct: margenSugerido,
       stockDisponible: null,
     }]);
   }
@@ -90,6 +105,10 @@ export default function CotizadorForm({
       if (patch.descuento_linea_pct !== undefined) {
         actualizada.descuento_linea_monto = round2(actualizada.cantidad * actualizada.precio_unitario * (patch.descuento_linea_pct / 100));
       }
+      // en modo "Costo + Margen", el precio se recalcula solo a partir del costo y el margen
+      if (actualizada.modo_precio === 'COSTO_MARGEN' && (patch.costo_unitario !== undefined || patch.margen_pct !== undefined || patch.modo_precio !== undefined)) {
+        actualizada.precio_unitario = precioPorMargen(actualizada.costo_unitario, actualizada.margen_pct ?? margenSugerido);
+      }
       return actualizada;
     }));
   }
@@ -98,9 +117,28 @@ export default function CotizadorForm({
     setLineas((prev) => prev.filter((l) => l.key !== key));
   }
 
+  function agregarCostoOperativo(concepto = '') {
+    setCostosOperativos((prev) => [...prev, { key: nuevaKey(), concepto, cantidad: 0, dias: 0, costo_unitario: 0 }]);
+  }
+
+  function actualizarCostoOperativo(key: string, patch: Partial<CostoOperativoEstado>) {
+    setCostosOperativos((prev) => prev.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+  }
+
+  function eliminarCostoOperativo(key: string) {
+    setCostosOperativos((prev) => prev.filter((c) => c.key !== key));
+  }
+
+  function agregarConceptosSugeridos() {
+    const existentes = new Set(costosOperativos.map((c) => c.concepto));
+    const faltantes = CONCEPTOS_SUGERIDOS.filter((c) => !existentes.has(c));
+    setCostosOperativos((prev) => [...prev, ...faltantes.map((concepto) => ({ key: nuevaKey(), concepto, cantidad: 0, dias: 0, costo_unitario: 0 }))]);
+  }
+
   const calculo = useMemo(() => calcularCotizacion(lineas, {
     descuentoGlobalPct, descuentoGlobalMonto, clienteEsRetenedorIva, parametros,
-  }), [lineas, descuentoGlobalPct, descuentoGlobalMonto, clienteEsRetenedorIva, parametros]);
+    costosOperativos, escalasComision,
+  }), [lineas, descuentoGlobalPct, descuentoGlobalMonto, clienteEsRetenedorIva, parametros, costosOperativos, escalasComision]);
 
   const totalEnLetras = numeroALetras(calculo.totalCotizado);
 
@@ -133,6 +171,7 @@ export default function CotizadorForm({
       comentario: comentario || null,
       numero_sistema_externo: numeroSistemaExterno || null,
       lineas: lineas.map(({ key, stockDisponible, ...l }) => l),
+      costos_operativos: costosOperativos.map(({ key, ...c }) => c),
     });
     setGuardando(false);
     if (resultado?.error) setError(resultado.error);
@@ -247,6 +286,9 @@ export default function CotizadorForm({
       {/* Productos */}
       <div className="card">
         <h2 className="mb-3 text-sm font-bold text-slate-700">Productos y servicios</h2>
+        <p className="mb-3 text-xs text-slate-400">
+          Los precios que se digitan aquí <b>ya incluyen IVA</b> (es el precio final que paga el cliente).
+        </p>
         <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
           <ProductPicker productos={productos} onSeleccionar={agregarDesdeCatalogo} />
           <button type="button" onClick={agregarFueraInventario} className="btn btn-secondary whitespace-nowrap">
@@ -255,14 +297,15 @@ export default function CotizadorForm({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-sm">
+          <table className="w-full min-w-[1040px] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
                 <th className="py-2 pr-2">Código</th>
                 <th className="py-2 pr-2">Descripción</th>
                 <th className="py-2 pr-2 w-20">Cant.</th>
                 <th className="py-2 pr-2 w-24">Costo U.</th>
-                <th className="py-2 pr-2 w-28">Precio U.</th>
+                <th className="py-2 pr-2 w-36">Modo de precio</th>
+                <th className="py-2 pr-2 w-28">Precio U. (c/IVA)</th>
                 <th className="py-2 pr-2 w-20">Desc. %</th>
                 <th className="py-2 pr-2 w-28">Subtotal</th>
                 <th className="w-8"></th>
@@ -281,7 +324,7 @@ export default function CotizadorForm({
                         <span className="font-mono text-xs text-slate-500">{l.codigo_mostrado}</span>
                       )}
                     </td>
-                    <td className="py-2 pr-2 min-w-[220px]">
+                    <td className="py-2 pr-2 min-w-[200px]">
                       {l.es_fuera_inventario ? (
                         <input className="input" value={l.descripcion}
                                onChange={(e) => actualizarLinea(l.key, { descripcion: e.target.value })}
@@ -301,7 +344,22 @@ export default function CotizadorForm({
                              onChange={(e) => actualizarLinea(l.key, { costo_unitario: Number(e.target.value) })} />
                     </td>
                     <td className="py-2 pr-2">
+                      <select className="input" value={l.modo_precio}
+                              onChange={(e) => actualizarLinea(l.key, { modo_precio: e.target.value as ModoPrecioLinea })}>
+                        <option value="FIJO">Precio fijo</option>
+                        <option value="COSTO_MARGEN">Costo + margen %</option>
+                      </select>
+                      {l.modo_precio === 'COSTO_MARGEN' && (
+                        <div className="mt-1 flex items-center gap-1">
+                          <input type="number" min={0} max={99} step="0.1" className="input" value={round1((l.margen_pct ?? margenSugerido) * 100)}
+                                 onChange={(e) => actualizarLinea(l.key, { margen_pct: Number(e.target.value) / 100 })} />
+                          <span className="text-xs text-slate-400">% margen</span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2 pr-2">
                       <input type="number" min={0} step="0.01" className="input" value={l.precio_unitario}
+                             disabled={l.modo_precio === 'COSTO_MARGEN'}
                              onChange={(e) => actualizarLinea(l.key, { precio_unitario: Number(e.target.value) })} />
                     </td>
                     <td className="py-2 pr-2">
@@ -316,56 +374,163 @@ export default function CotizadorForm({
                 );
               })}
               {lineas.length === 0 && (
-                <tr><td colSpan={8} className="py-8 text-center text-slate-400">Busque un producto del inventario o agregue uno fuera de inventario.</td></tr>
+                <tr><td colSpan={9} className="py-8 text-center text-slate-400">Busque un producto del inventario o agregue uno fuera de inventario.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Descuentos y resumen fiscal */}
-      <div className="card grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-3 text-sm font-bold text-slate-700">Descuento sobre el subtotal</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Descuento global (%)</label>
-              <input type="number" min={0} max={100} step="0.01" className="input" value={descuentoGlobalPct}
-                     onChange={(e) => { setDescuentoGlobalPct(Number(e.target.value)); setDescuentoGlobalMonto(0); }} />
-            </div>
-            <div>
-              <label className="label">o monto fijo (Q)</label>
-              <input type="number" min={0} step="0.01" className="input" value={descuentoGlobalMonto}
-                     onChange={(e) => { setDescuentoGlobalMonto(Number(e.target.value)); setDescuentoGlobalPct(0); }} />
-            </div>
+      {/* Costos operativos adicionales (uso interno, nunca se muestra al cliente) */}
+      <div className="card">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-slate-700">Costos operativos adicionales del proyecto</h2>
+            <p className="text-xs text-slate-400">Opcional: hospedaje, viáticos, combustible, mano de obra, instalación, etc. Uso interno — nunca se muestra al cliente, pero sí resta de la utilidad y de la comisión.</p>
           </div>
-          {calculo.requiereAutorizacion && (
-            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              El descuento efectivo es de {calculo.porcentajeDescuentoEfectivo.toFixed(2)}%, mayor al{' '}
-              {(parametros.descuento_umbral_autorizacion * 100).toFixed(0)}% permitido sin aprobación. Esta cotización
-              quedará en estado <b>Pend. Autorizar</b> hasta que un Autorizador la apruebe.
-            </div>
-          )}
-          <div className="mt-4 rounded-lg bg-navy-50 p-3 text-xs text-navy-800">
-            <p className="font-semibold">Valor en letras</p>
-            <p className="mt-1">{totalEnLetras}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={agregarConceptosSugeridos} className="btn btn-secondary whitespace-nowrap text-xs">
+              + Conceptos comunes
+            </button>
+            <button type="button" onClick={() => agregarCostoOperativo()} className="btn btn-secondary whitespace-nowrap text-xs">
+              + Agregar fila
+            </button>
           </div>
         </div>
 
-        <div>
-          <h2 className="mb-3 text-sm font-bold text-slate-700">Resumen fiscal (Guatemala)</h2>
-          <dl className="space-y-1.5 text-sm">
-            <Fila label="Subtotal" valor={calculo.subtotalBruto} />
-            <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
-            <Fila label="Base gravable (sin IVA)" valor={calculo.baseGravable} negrita />
-            <Fila label="IVA (12%)" valor={calculo.ivaMonto} />
-            <Fila label="Total cotizado" valor={calculo.totalCotizado} negrita grande />
-            <hr className="my-2 border-slate-200" />
-            <Fila label="Retención ISR" valor={-calculo.isrRetencion} tono="text-red-600" />
-            <Fila label="Retención IVA (12% del IVA)" valor={-calculo.ivaRetencion} tono="text-red-600" />
-            <Fila label="Pago neto a la empresa" valor={calculo.pagoNetoEmpresa} negrita tono="text-emerald-700" />
-          </dl>
+        {costosOperativos.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                  <th className="py-2 pr-2">Concepto</th>
+                  <th className="py-2 pr-2 w-32">Cant. (personas/unid.)</th>
+                  <th className="py-2 pr-2 w-32">Días/noches/tiempos</th>
+                  <th className="py-2 pr-2 w-32">Costo unitario (Q)</th>
+                  <th className="py-2 pr-2 w-28">Total</th>
+                  <th className="w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {costosOperativos.map((c) => (
+                  <tr key={c.key} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 pr-2">
+                      <input className="input" value={c.concepto} onChange={(e) => actualizarCostoOperativo(c.key, { concepto: e.target.value })} placeholder="Concepto" />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input type="number" min={0} step="0.01" className="input" value={c.cantidad} onChange={(e) => actualizarCostoOperativo(c.key, { cantidad: Number(e.target.value) })} />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input type="number" min={0} step="0.01" className="input" value={c.dias} onChange={(e) => actualizarCostoOperativo(c.key, { dias: Number(e.target.value) })} />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <input type="number" min={0} step="0.01" className="input" value={c.costo_unitario} onChange={(e) => actualizarCostoOperativo(c.key, { costo_unitario: Number(e.target.value) })} />
+                    </td>
+                    <td className="py-2 pr-2 font-semibold text-slate-700">{formatQ(round2(c.cantidad * c.dias * c.costo_unitario))}</td>
+                    <td className="py-2 text-right">
+                      <button type="button" onClick={() => eliminarCostoOperativo(c.key)} className="text-slate-400 hover:text-red-600">✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="mt-2 flex justify-end text-sm font-bold text-slate-700">
+          Total gastos operativos adicionales: {formatQ(calculo.costosOperativosTotal)}
         </div>
+      </div>
+
+      {/* Descuentos y resumen */}
+      <div className="card">
+        <h2 className="mb-3 text-sm font-bold text-slate-700">Descuento sobre el subtotal</h2>
+        <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+          <div>
+            <label className="label">Descuento global (%)</label>
+            <input type="number" min={0} max={100} step="0.01" className="input" value={descuentoGlobalPct}
+                   onChange={(e) => { setDescuentoGlobalPct(Number(e.target.value)); setDescuentoGlobalMonto(0); }} />
+          </div>
+          <div>
+            <label className="label">o monto fijo (Q)</label>
+            <input type="number" min={0} step="0.01" className="input" value={descuentoGlobalMonto}
+                   onChange={(e) => { setDescuentoGlobalMonto(Number(e.target.value)); setDescuentoGlobalPct(0); }} />
+          </div>
+        </div>
+        {calculo.requiereAutorizacion && (
+          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            El descuento efectivo es de {calculo.porcentajeDescuentoEfectivo.toFixed(2)}%, mayor al{' '}
+            {(parametros.descuento_umbral_autorizacion * 100).toFixed(0)}% permitido sin aprobación. Esta cotización
+            quedará en estado <b>Pend. Autorizar</b> hasta que un Autorizador la apruebe.
+          </div>
+        )}
+        <div className="mt-4 rounded-lg bg-navy-50 p-3 text-xs text-navy-800">
+          <p className="font-semibold">Valor en letras</p>
+          <p className="mt-1">{totalEnLetras}</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-700">Resumen</h2>
+          <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+            <button type="button" onClick={() => setVistaInterna(false)}
+              className={`rounded-md px-2.5 py-1 ${!vistaInterna ? 'bg-white shadow' : 'text-slate-500'}`}>
+              Vista cliente
+            </button>
+            <button type="button" onClick={() => setVistaInterna(true)}
+              className={`rounded-md px-2.5 py-1 ${vistaInterna ? 'bg-white shadow' : 'text-slate-500'}`}>
+              Vista interna (gerencial)
+            </button>
+          </div>
+        </div>
+
+        {!vistaInterna ? (
+          <dl className="max-w-md space-y-1.5 text-sm">
+            <Fila label="Subtotal (con IVA)" valor={calculo.subtotalBruto} />
+            <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
+            <Fila label="Total a pagar (incluye IVA)" valor={calculo.totalCotizado} negrita grande />
+            <hr className="my-2 border-slate-200" />
+            <p className="text-xs text-slate-400">Esta es la información que ve el cliente: sin costos, márgenes ni comisiones.</p>
+          </dl>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Resumen fiscal (Guatemala)</h3>
+              <dl className="space-y-1.5 text-sm">
+                <Fila label="Subtotal (con IVA)" valor={calculo.subtotalBruto} />
+                <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
+                <Fila label="Total cotizado (incluye IVA)" valor={calculo.totalCotizado} negrita />
+                <Fila label="Base gravable (sin IVA)" valor={calculo.baseGravable} />
+                <Fila label="IVA (12%)" valor={calculo.ivaMonto} />
+                <hr className="my-2 border-slate-200" />
+                <Fila label="Retención ISR" valor={-calculo.isrRetencion} tono="text-red-600" />
+                <Fila label="Retención IVA (12% del IVA)" valor={-calculo.ivaRetencion} tono="text-red-600" />
+                <Fila label="Pago neto a la empresa" valor={calculo.pagoNetoEmpresa} negrita tono="text-emerald-700" />
+              </dl>
+            </div>
+            <div>
+              <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Utilidad y comisión (uso interno)</h3>
+              <dl className="space-y-1.5 text-sm">
+                <Fila label="Costo total de productos/servicios" valor={calculo.costoTotalProductos} />
+                <Fila label="+ Gastos operativos adicionales" valor={calculo.costosOperativosTotal} />
+                <Fila label="= Costo total de operación" valor={calculo.costoTotalOperacion} negrita />
+                <Fila label="Utilidad bruta" valor={calculo.utilidadBruta} negrita tono="text-navy-700" />
+                <div className="flex justify-between text-sm text-slate-600"><dt>% Margen de utilidad</dt><dd className="font-semibold">{(calculo.margenUtilidadPct * 100).toFixed(2)}%</dd></div>
+                <div className="flex justify-between text-sm text-slate-600">
+                  <dt>Escala de comisión aplicada</dt>
+                  <dd className="font-semibold">{calculo.escala ? `Rango ${calculo.escala.rango} (${(calculo.escala.desde_pct * 100).toFixed(0)}%${calculo.escala.hasta_pct != null ? ` - ${(calculo.escala.hasta_pct * 100).toFixed(0)}%` : '+'})` : '—'}</dd>
+                </div>
+                <div className="flex justify-between text-sm text-slate-600"><dt>% Comisión al vendedor</dt><dd className="font-semibold">{(calculo.comisionEstimadaPct * 100).toFixed(2)}%</dd></div>
+                <Fila label="Comisión estimada a pagar" valor={calculo.comisionEstimadaMonto} tono="text-amber-700" />
+                <hr className="my-2 border-slate-200" />
+                <Fila label="Ganancia neta estimada para la empresa" valor={calculo.gananciaNetaEstimada} negrita grande tono="text-emerald-700" />
+                {calculo.escala?.observacion && (
+                  <p className="mt-1 text-xs text-slate-400">{calculo.escala.observacion}</p>
+                )}
+              </dl>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:flex-row sm:justify-end lg:-mx-8 lg:px-8">
@@ -391,3 +556,4 @@ function Fila({ label, valor, negrita, grande, tono }: { label: string; valor: n
 }
 
 function round2(n: number) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+function round1(n: number) { return Math.round((n + Number.EPSILON) * 10) / 10; }
