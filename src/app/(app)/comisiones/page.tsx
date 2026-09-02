@@ -2,11 +2,13 @@ import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { formatQ, formatFecha } from '@/lib/utils';
 import StatCard from '@/components/StatCard';
-import type { ComisionCalculada } from '@/lib/types';
+import type { ComisionCalculada, Vendedor } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ComisionesPage() {
+export default async function ComisionesPage({
+  searchParams,
+}: { searchParams: { desde?: string; hasta?: string; vendedor_id?: string } }) {
   const sesion = await requireSesion();
   const supabase = createClient();
 
@@ -15,12 +17,19 @@ export default async function ComisionesPage() {
     .select('*, vendedor:vendedores(codigo, nombre_completo), cotizacion:cotizaciones(numero_interno, numero_sistema_externo)')
     .order('fecha_facturacion', { ascending: false });
   if (!verTodas && sesion.vendedorId) query = query.eq('vendedor_id', sesion.vendedorId);
+  if (searchParams.desde) query = query.gte('fecha_facturacion', searchParams.desde);
+  if (searchParams.hasta) query = query.lte('fecha_facturacion', searchParams.hasta);
+  if (verTodas && searchParams.vendedor_id) query = query.eq('vendedor_id', searchParams.vendedor_id);
 
-  const { data } = await query.limit(500);
+  const [{ data }, { data: vendedoresData }] = await Promise.all([
+    query.limit(500),
+    verTodas ? supabase.from('vendedores').select('*').eq('activo', true).order('nombre_completo') : Promise.resolve({ data: [] as Vendedor[] }),
+  ]);
   const comisiones = (data ?? []) as (ComisionCalculada & {
     vendedor: { codigo: string; nombre_completo: string } | null;
     cotizacion: { numero_interno: string; numero_sistema_externo: string | null } | null;
   })[];
+  const vendedores = (vendedoresData ?? []) as Vendedor[];
 
   const totalComision = comisiones.reduce((a, c) => a + Number(c.monto_comision), 0);
   const totalBase = comisiones.reduce((a, c) => a + Number(c.base_calculo), 0);
@@ -37,7 +46,27 @@ export default async function ComisionesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold text-slate-800">Comisiones {verTodas ? 'por vendedor' : ''}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-slate-800">Comisiones {verTodas ? 'por vendedor' : ''}</h1>
+        <a href={`/api/comisiones/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
+          ⬇️ Exportar Excel
+        </a>
+      </div>
+
+      <form className="card flex flex-wrap items-end gap-3">
+        <div><label className="label">Desde</label><input type="date" name="desde" defaultValue={searchParams.desde} className="input" /></div>
+        <div><label className="label">Hasta</label><input type="date" name="hasta" defaultValue={searchParams.hasta} className="input" /></div>
+        {verTodas && (
+          <div>
+            <label className="label">Vendedor</label>
+            <select name="vendedor_id" defaultValue={searchParams.vendedor_id ?? ''} className="input min-w-[200px]">
+              <option value="">Todos</option>
+              {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nombre_completo}</option>)}
+            </select>
+          </div>
+        )}
+        <button className="btn btn-primary">Filtrar</button>
+      </form>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard titulo="Cotizaciones facturadas" valor={String(comisiones.length)} />
