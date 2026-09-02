@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { actualizarEscalaComision, actualizarParametros } from './actions';
+import { actualizarEscalaComision, actualizarParametros, crearEscalaComision, eliminarEscalaComision } from './actions';
 import type { EscalaComision, ParametrosFiscales } from '@/lib/types';
 
 const FUENTES = [
@@ -25,6 +25,8 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
 
   const [escalas, setEscalas] = useState<EscalaComision[]>(escalasComision);
   const [guardandoEscalas, setGuardandoEscalas] = useState(false);
+  const [agregandoEscala, setAgregandoEscala] = useState(false);
+  const [eliminandoEscala, setEliminandoEscala] = useState<number | null>(null);
 
   function set<K extends keyof ParametrosFiscales>(key: K, value: ParametrosFiscales[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -67,6 +69,22 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
     setGuardando(false);
     if (r?.error) setError(r.error);
     else { setMensaje('Parámetros actualizados correctamente.'); router.refresh(); }
+  }
+
+  async function agregarEscala() {
+    setAgregandoEscala(true);
+    setError(null);
+    const r = await crearEscalaComision();
+    setAgregandoEscala(false);
+    if (r?.error) setError(r.error); else router.refresh();
+  }
+
+  async function eliminarEscala(rango: number) {
+    setEliminandoEscala(rango);
+    setError(null);
+    const r = await eliminarEscalaComision(rango);
+    setEliminandoEscala(null);
+    if (r?.error) setError(r.error); else router.refresh();
   }
 
   async function guardarEscalas() {
@@ -113,6 +131,9 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
               <option value="0">No — nunca se calcula retención de IVA</option>
             </select>
           </Campo>
+          <Campo label="Retención de IVA (%)" hint="Se aplica SOBRE EL MONTO DE IVA (no sobre el total) cuando el cliente es agente retenedor. Ej. 0.15 = 15%">
+            <input type="number" step="0.001" className="input" value={form.retencion_iva_porcentaje} onChange={(e) => set('retencion_iva_porcentaje', Number(e.target.value))} />
+          </Campo>
         </div>
       </div>
 
@@ -145,6 +166,7 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
                 <th className="py-2 pr-2">Hasta % margen</th>
                 <th className="py-2 pr-2">% Comisión</th>
                 <th className="py-2 pr-2">Observación</th>
+                <th className="w-8"></th>
               </tr>
             </thead>
             <tbody>
@@ -166,14 +188,25 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
                   <td className="py-2 pr-2">
                     <input className="input" value={e.observacion ?? ''} onChange={(ev) => setEscala(e.rango, { observacion: ev.target.value })} />
                   </td>
+                  <td className="py-2 text-right">
+                    <button type="button" disabled={eliminandoEscala === e.rango} title="Eliminar este rango"
+                            onClick={() => eliminarEscala(e.rango)} className="text-slate-400 hover:text-red-600">
+                      {eliminandoEscala === e.rango ? '…' : '✕'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <button disabled={guardandoEscalas} className="btn btn-secondary mt-3" onClick={guardarEscalas}>
-          {guardandoEscalas ? 'Guardando…' : 'Guardar escala de comisiones'}
-        </button>
+        <div className="mt-3 flex gap-2">
+          <button disabled={guardandoEscalas} className="btn btn-secondary" onClick={guardarEscalas}>
+            {guardandoEscalas ? 'Guardando…' : 'Guardar escala de comisiones'}
+          </button>
+          <button type="button" disabled={agregandoEscala} className="btn btn-ghost" onClick={agregarEscala}>
+            {agregandoEscala ? 'Agregando…' : '+ Agregar rango'}
+          </button>
+        </div>
       </div>
 
       <div className="card">
