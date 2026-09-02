@@ -95,6 +95,7 @@ export interface ParametrosFiscales {
   correo_empresa: string | null;
   empresa_es_retenedor_iva: boolean;
   leyenda_cotizacion: string;
+  margen_sugerido_defecto: number;
 }
 
 export interface Cotizacion {
@@ -136,7 +137,19 @@ export interface Cotizacion {
   creado_por: string;
   creado_en: string;
   actualizado_en: string;
+  // Resumen financiero interno (Módulo Avanzado de Cotizaciones — Etapa 1)
+  costo_total_productos: number;
+  costos_operativos_total: number;
+  costo_total_operacion: number;
+  utilidad_bruta: number;
+  margen_utilidad_pct: number;
+  escala_comision_rango: number | null;
+  comision_estimada_pct: number;
+  comision_estimada_monto: number;
+  ganancia_neta_estimada: number;
 }
+
+export type ModoPrecioLinea = 'FIJO' | 'COSTO_MARGEN';
 
 export interface CotizacionDetalle {
   id: string;
@@ -152,6 +165,26 @@ export interface CotizacionDetalle {
   descuento_linea_pct: number;
   descuento_linea_monto: number;
   subtotal_linea: number;
+  modo_precio: ModoPrecioLinea;
+  margen_pct: number | null;
+}
+
+export interface CotizacionCostoOperativo {
+  id: string;
+  cotizacion_id: string;
+  orden: number;
+  concepto: string;
+  cantidad: number;
+  dias: number;
+  costo_unitario: number;
+}
+
+export interface EscalaComision {
+  rango: number;
+  desde_pct: number;
+  hasta_pct: number | null;
+  porcentaje_comision: number;
+  observacion: string | null;
 }
 
 export interface CotizacionHistorialEstado {
