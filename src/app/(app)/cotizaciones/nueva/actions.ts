@@ -40,6 +40,7 @@ export interface CrearCotizacionPayload {
   descuento_global_monto: number;
   comentario: string | null;
   numero_sistema_externo: string | null;
+  plantilla_id: string | null;
   prorratear_costos_operativos: boolean;
   mostrar_precios_unitarios_cliente: boolean;
   mostrar_vendedor_cliente: boolean;
@@ -74,6 +75,7 @@ export async function crearCotizacion(payload: CrearCotizacionPayload) {
       descuento_global_monto: payload.descuento_global_monto,
       comentario: payload.comentario,
       numero_sistema_externo: payload.numero_sistema_externo,
+      plantilla_id: payload.plantilla_id,
       prorratear_costos_operativos: payload.prorratear_costos_operativos,
       mostrar_precios_unitarios_cliente: payload.mostrar_precios_unitarios_cliente,
       mostrar_vendedor_cliente: payload.mostrar_vendedor_cliente,
