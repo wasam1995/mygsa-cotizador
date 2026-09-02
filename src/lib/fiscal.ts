@@ -145,6 +145,19 @@ export function precioPorMargen(costoUnitario: number, margenPct: number): numbe
   return round2(costoUnitario / (1 - margenPct));
 }
 
+// Reparte el total de costos operativos adicionales entre las líneas de productos, en
+// proporción a la venta de cada una (cantidad x precio unitario). Solo para mostrar en la
+// vista interna — no cambia la utilidad total de la cotización, que ya se calcula sobre el
+// total de costos operativos sin importar cómo se repartan.
+export function distribuirCostosOperativosPorLinea<T extends { cantidad: number; precio_unitario: number }>(
+  lineas: T[],
+  costosOperativosTotal: number
+): number[] {
+  const ventaTotal = lineas.reduce((acc, l) => acc + l.cantidad * l.precio_unitario, 0);
+  if (ventaTotal <= 0 || costosOperativosTotal <= 0) return lineas.map(() => 0);
+  return lineas.map((l) => round2(((l.cantidad * l.precio_unitario) / ventaTotal) * costosOperativosTotal));
+}
+
 function round2(n: number) { return Math.round((n + Number.EPSILON) * 100) / 100; }
 function round3(n: number) { return Math.round((n + Number.EPSILON) * 1000) / 1000; }
 function round4(n: number) { return Math.round((n + Number.EPSILON) * 10000) / 10000; }

@@ -76,6 +76,8 @@ export interface Producto {
   activo: boolean;
   es_fuera_inventario: boolean;
   observacion: string | null;
+  imagen_url: string | null;
+  especificaciones: string | null;
 }
 
 export interface ParametrosFiscales {
@@ -147,6 +149,10 @@ export interface Cotizacion {
   comision_estimada_pct: number;
   comision_estimada_monto: number;
   ganancia_neta_estimada: number;
+  // Edición y visibilidad (Etapa 2)
+  prorratear_costos_operativos: boolean;
+  mostrar_precios_unitarios_cliente: boolean;
+  mostrar_vendedor_cliente: boolean;
 }
 
 export type ModoPrecioLinea = 'FIJO' | 'COSTO_MARGEN';
@@ -167,6 +173,7 @@ export interface CotizacionDetalle {
   subtotal_linea: number;
   modo_precio: ModoPrecioLinea;
   margen_pct: number | null;
+  incluir_foto: boolean;
 }
 
 export interface CotizacionCostoOperativo {
