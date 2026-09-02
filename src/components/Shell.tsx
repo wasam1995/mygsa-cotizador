@@ -24,6 +24,7 @@ const NAV: NavItem[] = [
   { href: '/reportes', label: 'Reportes', icon: '📈', permiso: 'REPORTES_VER' },
   { href: '/usuarios', label: 'Usuarios y roles', icon: '👤', permiso: 'USUARIOS_ADMINISTRAR' },
   { href: '/auditoria', label: 'Bitácora', icon: '📜', permiso: 'AUDITORIA_VER' },
+  { href: '/plantillas', label: 'Plantillas', icon: '📝', permiso: 'PLANTILLAS_EDITAR' },
   { href: '/parametros', label: 'Parámetros', icon: '⚙️', permiso: 'PARAMETROS_EDITAR' },
 ];
 

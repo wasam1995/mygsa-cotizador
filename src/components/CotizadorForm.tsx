@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import ProductPicker from './ProductPicker';
 import { calcularCotizacion, distribuirCostosOperativosPorLinea, numeroALetras, precioPorMargen } from '@/lib/fiscal';
 import { formatQ, esTelefonoGuatemalaValido, normalizarTelefonoGuatemala } from '@/lib/utils';
-import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ModoPrecioLinea, ParametrosFiscales, Producto, Vendedor } from '@/lib/types';
+import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ModoPrecioLinea, ParametrosFiscales, PlantillaCotizacion, Producto, Vendedor } from '@/lib/types';
 import { crearCotizacion, type CostoOperativoPayload, type LineaPayload } from '@/app/(app)/cotizaciones/nueva/actions';
 import { actualizarCotizacionCompleta } from '@/app/(app)/cotizaciones/[id]/actions';
 
@@ -24,13 +24,14 @@ const nuevaKey = () => `L${Date.now()}_${contadorKey++}`;
 const CONCEPTOS_SUGERIDOS = ['Hospedaje', 'Viáticos', 'Combustible', 'Mano de obra', 'Instalación'];
 
 export default function CotizadorForm({
-  vendedores, clientes, productos, parametros, escalasComision, esVendedorFijo, vendedorInicial, cotizacionExistente,
+  vendedores, clientes, productos, parametros, escalasComision, plantillas, esVendedorFijo, vendedorInicial, cotizacionExistente,
 }: {
   vendedores: Vendedor[];
   clientes: Cliente[];
   productos: Producto[];
   parametros: ParametrosFiscales;
   escalasComision: EscalaComision[];
+  plantillas: PlantillaCotizacion[];
   esVendedorFijo: boolean;
   vendedorInicial: Vendedor | null;
   cotizacionExistente?: {
@@ -55,6 +56,9 @@ export default function CotizadorForm({
   const [clienteEsRetenedorIva, setClienteEsRetenedorIva] = useState(cotOriginal?.cliente_es_retenedor_iva ?? false);
 
   const [numeroSistemaExterno, setNumeroSistemaExterno] = useState(cotOriginal?.numero_sistema_externo ?? '');
+  const [plantillaId, setPlantillaId] = useState(
+    cotOriginal?.plantilla_id ?? plantillas.find((p) => p.es_predeterminada)?.id ?? plantillas[0]?.id ?? ''
+  );
   const [comentario, setComentario] = useState(cotOriginal?.comentario ?? '');
   const [descuentoGlobalPct, setDescuentoGlobalPct] = useState(cotOriginal?.descuento_global_pct ?? 0);
   const [descuentoGlobalMonto, setDescuentoGlobalMonto] = useState(cotOriginal?.descuento_global_monto ?? 0);
@@ -211,6 +215,7 @@ export default function CotizadorForm({
       descuento_global_monto: descuentoGlobalMonto,
       comentario: comentario || null,
       numero_sistema_externo: numeroSistemaExterno || null,
+      plantilla_id: plantillaId || null,
       prorratear_costos_operativos: prorratearCostosOperativos,
       mostrar_precios_unitarios_cliente: mostrarPreciosUnitariosCliente,
       mostrar_vendedor_cliente: mostrarVendedorCliente,
@@ -244,6 +249,17 @@ export default function CotizadorForm({
                 Puede guardar como borrador sin este dato; es obligatorio para finalizar/enviar al cliente.
               </p>
             </div>
+
+            {plantillas.length > 0 && (
+              <div>
+                <label className="label">Plantilla de condiciones comerciales</label>
+                <select className="input" value={plantillaId} onChange={(e) => setPlantillaId(e.target.value)}>
+                  {plantillas.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nombre}{p.es_predeterminada ? ' (predeterminada)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="label">Vendedor</label>
