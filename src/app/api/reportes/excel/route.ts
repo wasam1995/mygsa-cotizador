@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { construirLibroExcel, respuestaExcel } from '@/lib/excel';
+import type { HojaExcel } from '@/lib/excel';
 import type { EstadoCotizacion } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -20,22 +21,44 @@ export async function GET(req: NextRequest) {
 
   const { data } = await query.limit(5000);
   const filas = (data ?? []).map((c: any) => ({
-    'No. Interno': c.numero_interno,
-    'No. ERP': c.numero_sistema_externo ?? '',
-    Fecha: c.fecha_emision,
-    Cliente: c.cliente?.nombre_razon ?? '',
-    Vendedor: c.vendedor?.nombre_completo ?? '',
-    Estado: c.estado,
-    Subtotal: Number(c.subtotal),
-    Descuentos: Number(c.total_descuentos),
-    'Base Gravable': Number(c.base_gravable),
-    IVA: Number(c.iva_monto),
-    Total: Number(c.total_cotizado),
-    'Retención ISR': Number(c.isr_retencion),
-    'Retención IVA': Number(c.iva_retencion),
-    'Pago Neto Empresa': Number(c.pago_neto_empresa),
+    numero_interno: c.numero_interno,
+    numero_erp: c.numero_sistema_externo ?? '',
+    fecha: c.fecha_emision,
+    cliente: c.cliente?.nombre_razon ?? '',
+    vendedor: c.vendedor?.nombre_completo ?? '',
+    estado: c.estado,
+    subtotal: Number(c.subtotal),
+    descuentos: Number(c.total_descuentos),
+    base_gravable: Number(c.base_gravable),
+    iva: Number(c.iva_monto),
+    total: Number(c.total_cotizado),
+    retencion_isr: Number(c.isr_retencion),
+    retencion_iva: Number(c.iva_retencion),
+    pago_neto_empresa: Number(c.pago_neto_empresa),
   }));
 
-  const buffer = construirLibroExcel([{ nombre: 'Cotizaciones', filas }]);
+  const hoja: HojaExcel = {
+    nombre: 'Cotizaciones',
+    columnas: [
+      { header: 'No. Interno', key: 'numero_interno', tipo: 'texto' },
+      { header: 'No. ERP', key: 'numero_erp', tipo: 'texto' },
+      { header: 'Fecha', key: 'fecha', tipo: 'fecha' },
+      { header: 'Cliente', key: 'cliente', tipo: 'texto' },
+      { header: 'Vendedor', key: 'vendedor', tipo: 'texto' },
+      { header: 'Estado', key: 'estado', tipo: 'texto' },
+      { header: 'Subtotal', key: 'subtotal', tipo: 'moneda' },
+      { header: 'Descuentos', key: 'descuentos', tipo: 'moneda' },
+      { header: 'Base Gravable', key: 'base_gravable', tipo: 'moneda' },
+      { header: 'IVA', key: 'iva', tipo: 'moneda' },
+      { header: 'Total', key: 'total', tipo: 'moneda' },
+      { header: 'Retención ISR', key: 'retencion_isr', tipo: 'moneda' },
+      { header: 'Retención IVA', key: 'retencion_iva', tipo: 'moneda' },
+      { header: 'Pago Neto Empresa', key: 'pago_neto_empresa', tipo: 'moneda' },
+    ],
+    filas,
+    totales: ['subtotal', 'descuentos', 'iva', 'total', 'retencion_isr', 'retencion_iva', 'pago_neto_empresa'],
+  };
+
+  const buffer = construirLibroExcel([hoja]);
   return respuestaExcel(buffer, 'reporte_cotizaciones.xlsx');
 }
