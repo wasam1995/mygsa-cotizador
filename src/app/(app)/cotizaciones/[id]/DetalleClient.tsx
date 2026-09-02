@@ -2,10 +2,11 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import PrintQuote from '@/components/PrintQuote';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
-import { cambiarEstado, subirPdfCotizacion, obtenerUrlAdjunto } from './actions';
+import { cambiarEstado, eliminarCotizacion, subirPdfCotizacion, obtenerUrlAdjunto } from './actions';
 import type { Cotizacion, CotizacionAdjunto, CotizacionCostoOperativo, CotizacionDetalle, CotizacionHistorialEstado, ParametrosFiscales } from '@/lib/types';
 
 type Tab = 'interno' | 'impresion';
@@ -37,11 +38,24 @@ export default function DetalleClient({
   const [motivo, setMotivo] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [mostrarConfirmarEliminar, setMostrarConfirmarEliminar] = useState(false);
 
   const puedeAnular = permisos.includes('COTIZACIONES_ANULAR') || (esCreador && cotizacion.estado === 'PROSPECTO');
   const puedeAutorizar = permisos.includes('COTIZACIONES_AUTORIZAR');
   const puedeFacturar = permisos.includes('COTIZACIONES_FACTURAR');
   const puedeGestionar = permisos.includes('COTIZACIONES_CREAR') || permisos.includes('COTIZACIONES_VER_TODAS');
+  // Cualquier cotización que NO esté facturada la puede modificar/eliminar quien la gestiona;
+  // una facturada solo quien tenga permiso para ver todas (Autorizador/Administrador).
+  const puedeModificarOEliminar = cotizacion.estado !== 'FACTURADO' ? puedeGestionar : permisos.includes('COTIZACIONES_VER_TODAS');
+
+  async function handleEliminar() {
+    setError(null);
+    setEliminando(true);
+    const r = await eliminarCotizacion(cotizacion.id);
+    setEliminando(false);
+    if (r?.error) setError(r.error);
+  }
 
   function ejecutar(nuevoEstado: Cotizacion['estado'], motivoAnulacion?: string) {
     setError(null);
@@ -81,8 +95,31 @@ export default function DetalleClient({
         <div className="flex items-center gap-2">
           <StatusBadge estado={cotizacion.estado} />
           <button onClick={() => window.print()} className="btn btn-secondary">🖨️ Imprimir / PDF</button>
+          {puedeModificarOEliminar && (
+            <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">✏️ Modificar</Link>
+          )}
+          {puedeModificarOEliminar && (
+            <button onClick={() => setMostrarConfirmarEliminar(true)} className="btn btn-danger">🗑️ Eliminar</button>
+          )}
         </div>
       </div>
+
+      {mostrarConfirmarEliminar && (
+        <div className="card no-print border-red-200 bg-red-50">
+          <p className="text-sm font-bold text-red-700">¿Eliminar esta cotización?</p>
+          <p className="mt-1 text-sm text-red-600">
+            Esta acción no se puede deshacer y borra por completo el registro de {cotizacion.numero_interno}
+            {cotizacion.estado === 'FACTURADO' ? ' (ya facturada). Los movimientos de inventario y la comisión ya generados se conservan, pero quedarán sin cotización asociada.' : '.'}
+            {' '}Si solo quiere dejarla sin efecto conservando el registro, use "Anular" en vez de esto.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button disabled={eliminando} className="btn btn-danger" onClick={handleEliminar}>
+              {eliminando ? 'Eliminando…' : 'Sí, eliminar definitivamente'}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setMostrarConfirmarEliminar(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 no-print">{error}</div>}
 

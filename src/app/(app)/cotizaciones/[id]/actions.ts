@@ -3,7 +3,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import type { EstadoCotizacion } from '@/lib/types';
+import type { CrearCotizacionPayload } from '../nueva/actions';
 
 const PERMISO_POR_TRANSICION: Partial<Record<EstadoCotizacion, string>> = {
   PEND_AUTORIZAR: 'COTIZACIONES_CREAR',
@@ -75,4 +77,117 @@ export async function obtenerUrlAdjunto(rutaStorage: string) {
   const { data, error } = await supabase.storage.from('cotizaciones-pdf').createSignedUrl(rutaStorage, 60 * 10);
   if (error) return null;
   return data?.signedUrl ?? null;
+}
+
+// Reemplaza por completo los datos de una cotización existente: cabecera, líneas y
+// costos operativos. Cualquier cotización que NO esté FACTURADA la puede modificar su
+// dueño (o quien tenga "ver todas"); una FACTURADA solo quien tenga "ver todas"
+// (Autorizador/Administrador) — igual que aplica la seguridad a nivel de base de datos.
+export async function actualizarCotizacionCompleta(cotizacionId: string, payload: CrearCotizacionPayload) {
+  const sesion = await requireSesion();
+  const supabase = createClient();
+
+  const { data: actual } = await supabase.from('cotizaciones').select('estado, vendedor_id').eq('id', cotizacionId).single();
+  if (!actual) return { error: 'La cotización ya no existe.' };
+
+  const esDueno = actual.vendedor_id === sesion.vendedorId;
+  const puedeGestionarTodas = sesion.permisos.includes('COTIZACIONES_VER_TODAS');
+  if (actual.estado === 'FACTURADO' && !puedeGestionarTodas) {
+    return { error: 'Esta cotización ya está facturada. Solo un Autorizador o Administrador puede modificarla.' };
+  }
+  if (actual.estado !== 'FACTURADO' && !esDueno && !puedeGestionarTodas) {
+    return { error: 'No tiene permiso para modificar esta cotización.' };
+  }
+  if (payload.lineas.length === 0) {
+    return { error: 'Agregue al menos una línea de producto o servicio.' };
+  }
+
+  const { error: errCot } = await supabase.from('cotizaciones').update({
+    vendedor_id: payload.vendedor_id,
+    vendedor_telefono: payload.vendedor_telefono || null,
+    cliente_id: payload.cliente_id,
+    cliente_nombre_libre: payload.cliente_nombre_libre,
+    cliente_nit: payload.cliente_nit,
+    cliente_direccion: payload.cliente_direccion,
+    cliente_telefono: payload.cliente_telefono,
+    cliente_es_retenedor_iva: payload.cliente_es_retenedor_iva,
+    descuento_global_pct: payload.descuento_global_pct,
+    descuento_global_monto: payload.descuento_global_monto,
+    comentario: payload.comentario,
+    numero_sistema_externo: payload.numero_sistema_externo,
+    prorratear_costos_operativos: payload.prorratear_costos_operativos,
+    mostrar_precios_unitarios_cliente: payload.mostrar_precios_unitarios_cliente,
+    mostrar_vendedor_cliente: payload.mostrar_vendedor_cliente,
+  }).eq('id', cotizacionId);
+  if (errCot) return { error: errCot.message };
+
+  const { error: errDelDet } = await supabase.from('cotizacion_detalle').delete().eq('cotizacion_id', cotizacionId);
+  if (errDelDet) return { error: errDelDet.message };
+
+  const filas = payload.lineas.map((l, idx) => ({
+    cotizacion_id: cotizacionId,
+    linea: idx + 1,
+    producto_id: l.producto_id,
+    es_fuera_inventario: l.es_fuera_inventario,
+    codigo_mostrado: l.codigo_mostrado,
+    descripcion: l.descripcion,
+    cantidad: l.cantidad,
+    costo_unitario: l.costo_unitario,
+    precio_unitario: l.precio_unitario,
+    descuento_linea_pct: l.descuento_linea_pct,
+    descuento_linea_monto: l.descuento_linea_monto,
+    subtotal_linea: l.cantidad * l.precio_unitario - l.descuento_linea_monto,
+    modo_precio: l.modo_precio,
+    margen_pct: l.margen_pct,
+    incluir_foto: l.incluir_foto,
+  }));
+  const { error: errDet } = await supabase.from('cotizacion_detalle').insert(filas);
+  if (errDet) return { error: errDet.message };
+
+  const { error: errDelCosto } = await supabase.from('cotizacion_costos_operativos').delete().eq('cotizacion_id', cotizacionId);
+  if (errDelCosto) return { error: errDelCosto.message };
+
+  const costosValidos = payload.costos_operativos.filter((c) => c.concepto.trim() && (c.cantidad > 0 || c.dias > 0 || c.costo_unitario > 0));
+  if (costosValidos.length > 0) {
+    const filasCosto = costosValidos.map((c, idx) => ({
+      cotizacion_id: cotizacionId,
+      orden: idx + 1,
+      concepto: c.concepto,
+      cantidad: c.cantidad,
+      dias: c.dias,
+      costo_unitario: c.costo_unitario,
+    }));
+    const { error: errCosto } = await supabase.from('cotizacion_costos_operativos').insert(filasCosto);
+    if (errCosto) return { error: errCosto.message };
+  }
+
+  revalidatePath(`/cotizaciones/${cotizacionId}`);
+  revalidatePath('/cotizaciones');
+  redirect(`/cotizaciones/${cotizacionId}`);
+}
+
+// Elimina definitivamente una cotización (no es lo mismo que "Anular": esto borra el
+// registro). El kardex y las comisiones ya generadas por esta cotización NO se borran,
+// solo quedan sin cotización asociada (conservan número, cliente y vendedor).
+export async function eliminarCotizacion(cotizacionId: string) {
+  const sesion = await requireSesion();
+  const supabase = createClient();
+
+  const { data: actual } = await supabase.from('cotizaciones').select('estado, vendedor_id').eq('id', cotizacionId).single();
+  if (!actual) return { error: 'La cotización ya no existe.' };
+
+  const esDueno = actual.vendedor_id === sesion.vendedorId;
+  const puedeGestionarTodas = sesion.permisos.includes('COTIZACIONES_VER_TODAS');
+  if (actual.estado === 'FACTURADO' && !puedeGestionarTodas) {
+    return { error: 'Esta cotización ya está facturada. Solo un Autorizador o Administrador puede eliminarla.' };
+  }
+  if (actual.estado !== 'FACTURADO' && !esDueno && !puedeGestionarTodas) {
+    return { error: 'No tiene permiso para eliminar esta cotización.' };
+  }
+
+  const { error } = await supabase.from('cotizaciones').delete().eq('id', cotizacionId);
+  if (error) return { error: error.message };
+
+  revalidatePath('/cotizaciones');
+  redirect('/cotizaciones');
 }
