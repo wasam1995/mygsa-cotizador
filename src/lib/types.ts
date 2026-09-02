@@ -238,6 +238,18 @@ export interface ComisionCalculada {
   fecha_facturacion: string;
 }
 
+export interface AuditoriaRegistro {
+  id: number;
+  tabla: string;
+  registro_id: string | null;
+  accion: 'INSERT' | 'UPDATE' | 'DELETE';
+  usuario_id: string | null;
+  usuario_nombre: string | null;
+  datos_anteriores: Record<string, unknown> | null;
+  datos_nuevos: Record<string, unknown> | null;
+  creado_en: string;
+}
+
 // Genérico mínimo requerido por los tipos de @supabase/supabase-js. No representa el
 // esquema completo campo por campo (ver arriba las interfaces de conveniencia que sí
 // usa el resto de la aplicación) — evita tener que mantener dos fuentes de verdad.
