@@ -17,6 +17,7 @@ export interface LineaPayload {
   descuento_linea_monto: number;
   modo_precio: ModoPrecioLinea;
   margen_pct: number | null;
+  incluir_foto: boolean;
 }
 
 export interface CostoOperativoPayload {
@@ -39,6 +40,9 @@ export interface CrearCotizacionPayload {
   descuento_global_monto: number;
   comentario: string | null;
   numero_sistema_externo: string | null;
+  prorratear_costos_operativos: boolean;
+  mostrar_precios_unitarios_cliente: boolean;
+  mostrar_vendedor_cliente: boolean;
   lineas: LineaPayload[];
   costos_operativos: CostoOperativoPayload[];
 }
@@ -70,6 +74,9 @@ export async function crearCotizacion(payload: CrearCotizacionPayload) {
       descuento_global_monto: payload.descuento_global_monto,
       comentario: payload.comentario,
       numero_sistema_externo: payload.numero_sistema_externo,
+      prorratear_costos_operativos: payload.prorratear_costos_operativos,
+      mostrar_precios_unitarios_cliente: payload.mostrar_precios_unitarios_cliente,
+      mostrar_vendedor_cliente: payload.mostrar_vendedor_cliente,
       creado_por: sesion.userId,
       estado: 'PROSPECTO',
     })
@@ -95,6 +102,7 @@ export async function crearCotizacion(payload: CrearCotizacionPayload) {
     subtotal_linea: l.cantidad * l.precio_unitario - l.descuento_linea_monto,
     modo_precio: l.modo_precio,
     margen_pct: l.margen_pct,
+    incluir_foto: l.incluir_foto,
   }));
 
   const { error: errDet } = await supabase.from('cotizacion_detalle').insert(filas);
