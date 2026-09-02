@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import CotizadorForm from '@/components/CotizadorForm';
-import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ParametrosFiscales, Producto, Vendedor } from '@/lib/types';
+import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ParametrosFiscales, PlantillaCotizacion, Producto, Vendedor } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +22,7 @@ export default async function EditarCotizacionPage({ params }: { params: { id: s
     redirect(`/cotizaciones/${params.id}`);
   }
 
-  const [{ data: lineas }, { data: costosOperativos }, { data: vendedores }, { data: clientes }, { data: productos }, { data: parametros }, { data: escalas }] = await Promise.all([
+  const [{ data: lineas }, { data: costosOperativos }, { data: vendedores }, { data: clientes }, { data: productos }, { data: parametros }, { data: escalas }, { data: plantillas }] = await Promise.all([
     supabase.from('cotizacion_detalle').select('*').eq('cotizacion_id', params.id).order('linea'),
     supabase.from('cotizacion_costos_operativos').select('*').eq('cotizacion_id', params.id).order('orden'),
     supabase.from('vendedores').select('*').eq('activo', true).order('nombre_completo'),
@@ -30,6 +30,7 @@ export default async function EditarCotizacionPage({ params }: { params: { id: s
     supabase.from('v_productos_disponibles').select('*').eq('activo', true).order('nombre'),
     supabase.from('parametros_fiscales').select('*').eq('id', 1).single(),
     supabase.from('escalas_comision').select('*').order('rango'),
+    supabase.from('plantillas_cotizacion').select('*').eq('activo', true).order('nombre'),
   ]);
 
   const esVendedorFijo = sesion.rolCodigo === 'VENDEDOR';
@@ -46,6 +47,7 @@ export default async function EditarCotizacionPage({ params }: { params: { id: s
         productos={(productos ?? []) as Producto[]}
         parametros={parametros as ParametrosFiscales}
         escalasComision={(escalas ?? []) as EscalaComision[]}
+        plantillas={(plantillas ?? []) as PlantillaCotizacion[]}
         esVendedorFijo={esVendedorFijo}
         vendedorInicial={vendedorInicial as Vendedor | null}
         cotizacionExistente={{
