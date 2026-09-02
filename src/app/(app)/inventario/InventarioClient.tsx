@@ -66,6 +66,8 @@ function FilaProducto({
 }) {
   const [costo, setCosto] = useState(p.costo_unitario);
   const [precio, setPrecio] = useState(p.precio_lista);
+  const [imagenUrl, setImagenUrl] = useState(p.imagen_url ?? '');
+  const [especificaciones, setEspecificaciones] = useState(p.especificaciones ?? '');
   const [cantEntrada, setCantEntrada] = useState(0);
   const [comentEntrada, setComentEntrada] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -74,7 +76,15 @@ function FilaProducto({
     <>
       <tr className="border-b border-slate-100 last:border-0">
         <td className="py-2 pr-2 font-mono text-xs text-slate-500">{p.codigo}</td>
-        <td className="py-2 pr-2">{p.nombre}{p.color_variante ? ` (${p.color_variante})` : ''}</td>
+        <td className="py-2 pr-2">
+          <div className="flex items-center gap-2">
+            {p.imagen_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.imagen_url} alt={p.nombre} className="h-8 w-8 flex-shrink-0 rounded object-cover" />
+            )}
+            <span>{p.nombre}{p.color_variante ? ` (${p.color_variante})` : ''}</span>
+          </div>
+        </td>
         <td className="py-2 pr-2">{p.stock_actual}</td>
         <td className="py-2 pr-2">{p.stock_reservado}</td>
         <td className={`py-2 pr-2 font-semibold ${disponible <= p.stock_minimo ? 'text-red-600' : 'text-emerald-700'}`}>{disponible}</td>
@@ -94,9 +104,14 @@ function FilaProducto({
             <div className="flex flex-wrap items-end gap-3">
               <div><label className="label">Costo unitario</label><input type="number" step="0.01" className="input w-32" value={costo} onChange={(e) => setCosto(Number(e.target.value))} /></div>
               <div><label className="label">Precio lista</label><input type="number" step="0.01" className="input w-32" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} /></div>
+              <div className="min-w-[220px] flex-1"><label className="label">URL de imagen (opcional)</label><input className="input" placeholder="https://…" value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} /></div>
+              <div className="min-w-[220px] flex-1"><label className="label">Especificaciones (opcional)</label><input className="input" placeholder="Medidas, material, etc." value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} /></div>
               <button disabled={guardando} className="btn btn-primary" onClick={async () => {
                 setGuardando(true);
-                await actualizarProducto(p.id, { costo_unitario: costo, precio_lista: precio });
+                await actualizarProducto(p.id, {
+                  costo_unitario: costo, precio_lista: precio,
+                  imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
+                });
                 setGuardando(false);
                 onCerrarEdicion();
               }}>Guardar</button>
@@ -133,6 +148,8 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
   const [costo, setCosto] = useState(0);
   const [precio, setPrecio] = useState(0);
   const [stock, setStock] = useState(0);
+  const [imagenUrl, setImagenUrl] = useState('');
+  const [especificaciones, setEspecificaciones] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -147,12 +164,17 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
         <input type="number" step="0.01" className="input" placeholder="Costo" value={costo} onChange={(e) => setCosto(Number(e.target.value))} />
         <input type="number" step="0.01" className="input" placeholder="Precio lista" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} />
         <input type="number" step="1" className="input" placeholder="Stock inicial" value={stock} onChange={(e) => setStock(Number(e.target.value))} />
+        <input className="input sm:col-span-2" placeholder="URL de imagen (opcional)" value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} />
+        <input className="input" placeholder="Especificaciones (opcional)" value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} />
       </div>
       <div className="mt-3 flex gap-2">
         <button disabled={guardando} className="btn btn-orange" onClick={async () => {
           if (!codigo || !nombre) { setError('Código y nombre son obligatorios.'); return; }
           setGuardando(true);
-          const r = await crearProducto({ codigo, nombre, color_variante: color || null, unidad: 'unidad', costo_unitario: costo, precio_lista: precio, stock_actual: stock });
+          const r = await crearProducto({
+            codigo, nombre, color_variante: color || null, unidad: 'unidad', costo_unitario: costo, precio_lista: precio, stock_actual: stock,
+            imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
+          });
           setGuardando(false);
           if (r?.error) setError(r.error); else onClose();
         }}>Guardar</button>
