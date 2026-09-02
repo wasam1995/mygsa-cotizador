@@ -42,9 +42,14 @@ export default async function ReportesPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-slate-800">Reporte general de cotizaciones</h1>
-        <a href={`/api/reportes/csv?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
-          ⬇️ Exportar CSV
-        </a>
+        <div className="flex gap-2">
+          <a href={`/api/reportes/csv?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
+            ⬇️ Exportar CSV
+          </a>
+          <a href={`/api/reportes/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
+            ⬇️ Exportar Excel
+          </a>
+        </div>
       </div>
 
       <form className="card flex flex-wrap items-end gap-3">
