@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { formatFecha } from '@/lib/utils';
@@ -31,7 +32,12 @@ export default async function KardexPage({ searchParams }: { searchParams: { pro
 
   return (
     <div>
-      <h1 className="mb-5 text-xl font-bold text-slate-800">Kardex de inventario</h1>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-slate-800">Kardex de inventario</h1>
+        <a href={`/api/kardex/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
+          ⬇️ Exportar Excel
+        </a>
+      </div>
       <p className="mb-4 text-sm text-slate-500">
         Historial de entradas, salidas, reservas, anulaciones y ajustes — con cotización, cliente y vendedor asociados.
       </p>
@@ -67,7 +73,11 @@ export default async function KardexPage({ searchParams }: { searchParams: { pro
                 <td className="py-2 pr-2"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TIPO_COLOR[m.tipo]}`}>{m.tipo}</span></td>
                 <td className="py-2 pr-2">{m.producto?.codigo} — {m.producto?.nombre}</td>
                 <td className="py-2 pr-2 font-medium">{m.cantidad}</td>
-                <td className="py-2 pr-2 text-navy-700">{m.numero_cotizacion ?? '—'}</td>
+                <td className="py-2 pr-2 text-navy-700">
+                  {m.cotizacion_id ? (
+                    <Link href={`/cotizaciones/${m.cotizacion_id}`} className="font-semibold hover:underline">{m.numero_cotizacion ?? 'Ver'}</Link>
+                  ) : (m.numero_cotizacion ?? '—')}
+                </td>
                 <td className="py-2 pr-2">{m.cliente_nombre ?? '—'}</td>
                 <td className="py-2 pr-2">{m.vendedor_nombre ?? '—'}</td>
                 <td className="py-2 pr-2 text-slate-500">{m.stock_resultante ?? '—'}</td>
