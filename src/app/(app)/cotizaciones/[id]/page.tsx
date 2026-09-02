@@ -19,7 +19,7 @@ export default async function CotizacionDetallePage({ params }: { params: { id: 
   if (!cotizacion) notFound();
 
   const [{ data: lineas }, { data: historial }, { data: adjuntos }, { data: parametros }, { data: costosOperativos }, { data: movimientos }, { data: plantilla }] = await Promise.all([
-    supabase.from('cotizacion_detalle').select('*, producto:productos(imagen_url)').eq('cotizacion_id', params.id).order('linea'),
+    supabase.from('cotizacion_detalle').select('*, producto:productos(imagen_url, unidad, especificaciones)').eq('cotizacion_id', params.id).order('linea'),
     supabase.from('cotizacion_historial_estados').select('*').eq('cotizacion_id', params.id).order('creado_en'),
     supabase.from('cotizacion_adjuntos').select('*').eq('cotizacion_id', params.id).order('creado_en'),
     supabase.from('parametros_fiscales').select('*').eq('id', 1).single(),

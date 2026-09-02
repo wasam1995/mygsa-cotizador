@@ -111,9 +111,10 @@ export default function DetalleClient({
 
   // Genera un PDF real (descargable) a partir de una vista de impresión (cliente o
   // interna), capturándola como imagen con html2canvas y armando el archivo con jsPDF
-  // en A4 vertical. Ambos nodos (PrintQuote y PrintQuoteInterno) siempre están montados
-  // — visibles solo cuando corresponde, o fuera de pantalla en caso contrario — así que
-  // no hace falta cambiar de pestaña para capturarlos.
+  // en A4 vertical, con márgenes reales (15mm arriba/lados, 20mm abajo) y paginación
+  // automática con "Página X de Y" en el pie. Ambos nodos (PrintQuote y
+  // PrintQuoteInterno) siempre están montados — visibles solo cuando corresponde, o
+  // fuera de pantalla en caso contrario — así que no hace falta cambiar de pestaña.
   async function handleDescargarPDF(version: 'cliente' | 'interno') {
     setError(null);
     setGenerandoPdf(version);
@@ -129,20 +130,35 @@ export default function DetalleClient({
       const canvas = await html2canvas(nodo, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+
+      const MM = 2.834645669; // pt por mm
+      const margenSup = 15 * MM, margenLado = 15 * MM, margenInf = 20 * MM;
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
+      const imgWidth = pageWidth - margenLado * 2;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const alturaUtilPorPagina = pageHeight - margenSup - margenInf;
+
       let alturaRestante = imgHeight;
-      let posicion = 0;
-      pdf.addImage(imgData, 'PNG', 0, posicion, imgWidth, imgHeight);
-      alturaRestante -= pageHeight;
+      let corrimiento = 0;
+      pdf.addImage(imgData, 'PNG', margenLado, margenSup, imgWidth, imgHeight);
+      alturaRestante -= alturaUtilPorPagina;
       while (alturaRestante > 0) {
-        posicion = alturaRestante - imgHeight;
+        corrimiento += alturaUtilPorPagina;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, posicion, imgWidth, imgHeight);
-        alturaRestante -= pageHeight;
+        pdf.addImage(imgData, 'PNG', margenLado, margenSup - corrimiento, imgWidth, imgHeight);
+        alturaRestante -= alturaUtilPorPagina;
       }
+
+      const totalPaginas = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPaginas; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(120, 120, 120);
+        pdf.text(parametros.nombre_comercial || parametros.razon_social, margenLado, pageHeight - margenInf + 16);
+        pdf.text(`Página ${i} de ${totalPaginas}`, pageWidth - margenLado, pageHeight - margenInf + 16, { align: 'right' });
+      }
+
       const base = (cotizacion.numero_sistema_externo || cotizacion.numero_interno).replace(/[^a-zA-Z0-9-]/g, '_');
       pdf.save(version === 'interno' ? `${base}_INTERNO.pdf` : `${base}.pdf`);
     } catch (e) {
@@ -340,10 +356,10 @@ export default function DetalleClient({
               <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
               <FilaResumen label="Total cotizado (incluye IVA)" valor={cotizacion.total_cotizado} negrita grande />
               <FilaResumen label="Base gravable (sin IVA)" valor={cotizacion.base_gravable} />
-              <FilaResumen label="IVA (12%)" valor={cotizacion.iva_monto} />
+              <FilaResumen label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={cotizacion.iva_monto} />
               <hr className="my-2" />
               <FilaResumen label="Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
-              <FilaResumen label="Retención IVA" valor={-cotizacion.iva_retencion} tono="text-red-600" />
+              <FilaResumen label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_retencion} tono="text-red-600" />
               <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita tono="text-emerald-700" />
             </div>
             <div>
@@ -351,8 +367,10 @@ export default function DetalleClient({
               <FilaResumen label="Costo total de productos/servicios" valor={cotizacion.costo_total_productos} />
               <FilaResumen label="+ Gastos operativos adicionales" valor={cotizacion.costos_operativos_total} />
               <FilaResumen label="= Costo total de operación" valor={cotizacion.costo_total_operacion} negrita />
-              <FilaResumen label="Utilidad bruta" valor={cotizacion.utilidad_bruta} negrita tono="text-navy-700" />
-              <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>% Margen de utilidad</span><span className="font-semibold">{(cotizacion.margen_utilidad_pct * 100).toFixed(2)}%</span></div>
+              <FilaResumen label="Utilidad bruta (venta sin IVA - costo)" valor={cotizacion.utilidad_bruta} negrita tono="text-navy-700" />
+              <FilaResumen label="− Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
+              <FilaResumen label="= Utilidad neta (base de comisión)" valor={cotizacion.utilidad_neta} negrita tono="text-navy-700" />
+              <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>% Margen de utilidad (neta)</span><span className="font-semibold">{(cotizacion.margen_utilidad_pct * 100).toFixed(2)}%</span></div>
               <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>Escala de comisión aplicada</span><span className="font-semibold">{cotizacion.escala_comision_rango ? `Rango ${cotizacion.escala_comision_rango}` : '—'}</span></div>
               <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>% Comisión al vendedor</span><span className="font-semibold">{(cotizacion.comision_estimada_pct * 100).toFixed(2)}%</span></div>
               <FilaResumen label="Comisión estimada / pagada" valor={cotizacion.comision_estimada_monto} tono="text-amber-700" />
