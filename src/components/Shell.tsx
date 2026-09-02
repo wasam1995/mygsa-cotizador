@@ -20,6 +20,7 @@ const NAV: NavItem[] = [
   { href: '/inventario', label: 'Inventario', icon: '📦', permiso: 'INVENTARIO_VER' },
   { href: '/inventario/kardex', label: 'Kardex', icon: '📊', permiso: 'INVENTARIO_VER' },
   { href: '/clientes', label: 'Clientes', icon: '🧑‍💼' },
+  { href: '/vendedores', label: 'Vendedores', icon: '🧑‍💻' },
   { href: '/comisiones', label: 'Comisiones', icon: '💰' },
   { href: '/reportes', label: 'Reportes', icon: '📈', permiso: 'REPORTES_VER' },
   { href: '/usuarios', label: 'Usuarios y roles', icon: '👤', permiso: 'USUARIOS_ADMINISTRAR' },
