@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import type { ModoPrecioLinea } from '@/lib/types';
 
 export interface LineaPayload {
   producto_id: string | null;
@@ -14,6 +15,15 @@ export interface LineaPayload {
   precio_unitario: number;
   descuento_linea_pct: number;
   descuento_linea_monto: number;
+  modo_precio: ModoPrecioLinea;
+  margen_pct: number | null;
+}
+
+export interface CostoOperativoPayload {
+  concepto: string;
+  cantidad: number;
+  dias: number;
+  costo_unitario: number;
 }
 
 export interface CrearCotizacionPayload {
@@ -30,11 +40,13 @@ export interface CrearCotizacionPayload {
   comentario: string | null;
   numero_sistema_externo: string | null;
   lineas: LineaPayload[];
+  costos_operativos: CostoOperativoPayload[];
 }
 
-// Crea la cotización en estado PROSPECTO junto con sus líneas de detalle.
-// El cálculo fiscal (ISR/IVA/retenciones/letras) lo recalcula automáticamente
-// el trigger de Postgres en cuanto se insertan las líneas — no se calcula aquí.
+// Crea la cotización en estado PROSPECTO junto con sus líneas de detalle y sus costos
+// operativos adicionales. El cálculo fiscal y financiero (ISR/IVA/utilidad/comisión) lo
+// recalcula automáticamente el trigger de Postgres en cuanto se insertan las líneas — no
+// se calcula aquí.
 export async function crearCotizacion(payload: CrearCotizacionPayload) {
   const sesion = await requireSesion('COTIZACIONES_CREAR');
   const supabase = createClient();
@@ -81,12 +93,31 @@ export async function crearCotizacion(payload: CrearCotizacionPayload) {
     descuento_linea_pct: l.descuento_linea_pct,
     descuento_linea_monto: l.descuento_linea_monto,
     subtotal_linea: l.cantidad * l.precio_unitario - l.descuento_linea_monto,
+    modo_precio: l.modo_precio,
+    margen_pct: l.margen_pct,
   }));
 
   const { error: errDet } = await supabase.from('cotizacion_detalle').insert(filas);
   if (errDet) {
     await supabase.from('cotizaciones').delete().eq('id', cot.id);
     return { error: errDet.message };
+  }
+
+  const costosValidos = payload.costos_operativos.filter((c) => c.concepto.trim() && (c.cantidad > 0 || c.dias > 0 || c.costo_unitario > 0));
+  if (costosValidos.length > 0) {
+    const filasCosto = costosValidos.map((c, idx) => ({
+      cotizacion_id: cot.id,
+      orden: idx + 1,
+      concepto: c.concepto,
+      cantidad: c.cantidad,
+      dias: c.dias,
+      costo_unitario: c.costo_unitario,
+    }));
+    const { error: errCosto } = await supabase.from('cotizacion_costos_operativos').insert(filasCosto);
+    if (errCosto) {
+      await supabase.from('cotizaciones').delete().eq('id', cot.id);
+      return { error: errCosto.message };
+    }
   }
 
   redirect(`/cotizaciones/${cot.id}`);
