@@ -2,18 +2,25 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { actualizarParametros } from './actions';
-import type { ParametrosFiscales } from '@/lib/types';
+import { actualizarEscalaComision, actualizarParametros } from './actions';
+import type { EscalaComision, ParametrosFiscales } from '@/lib/types';
 
-export default function ParametrosClient({ parametros }: { parametros: ParametrosFiscales }) {
+export default function ParametrosClient({ parametros, escalasComision }: { parametros: ParametrosFiscales; escalasComision: EscalaComision[] }) {
   const router = useRouter();
   const [form, setForm] = useState<ParametrosFiscales>(parametros);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [escalas, setEscalas] = useState<EscalaComision[]>(escalasComision);
+  const [guardandoEscalas, setGuardandoEscalas] = useState(false);
+
   function set<K extends keyof ParametrosFiscales>(key: K, value: ParametrosFiscales[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function setEscala(rango: number, patch: Partial<EscalaComision>) {
+    setEscalas((prev) => prev.map((e) => (e.rango === rango ? { ...e, ...patch } : e)));
   }
 
   async function guardar() {
@@ -25,6 +32,21 @@ export default function ParametrosClient({ parametros }: { parametros: Parametro
     setGuardando(false);
     if (r?.error) setError(r.error);
     else { setMensaje('Parámetros actualizados correctamente.'); router.refresh(); }
+  }
+
+  async function guardarEscalas() {
+    setGuardandoEscalas(true);
+    setMensaje(null);
+    setError(null);
+    for (const e of escalas) {
+      const r = await actualizarEscalaComision(e.rango, {
+        desde_pct: e.desde_pct, hasta_pct: e.hasta_pct, porcentaje_comision: e.porcentaje_comision, observacion: e.observacion,
+      });
+      if (r?.error) { setError(r.error); setGuardandoEscalas(false); return; }
+    }
+    setGuardandoEscalas(false);
+    setMensaje('Escala de comisiones actualizada correctamente.');
+    router.refresh();
   }
 
   return (
@@ -68,7 +90,55 @@ export default function ParametrosClient({ parametros }: { parametros: Parametro
           <Campo label="Umbral de descuento que requiere autorización (%)" hint="Ej. 0.05 = 5%">
             <input type="number" step="0.001" className="input" value={form.descuento_umbral_autorizacion} onChange={(e) => set('descuento_umbral_autorizacion', Number(e.target.value))} />
           </Campo>
+          <Campo label="Margen sugerido por defecto (%)" hint="Se usa al agregar una línea en modo 'Costo + margen %'. Ej. 0.45 = 45%">
+            <input type="number" step="0.001" className="input" value={form.margen_sugerido_defecto} onChange={(e) => set('margen_sugerido_defecto', Number(e.target.value))} />
+          </Campo>
         </div>
+      </div>
+
+      <div className="card">
+        <h2 className="mb-1 text-sm font-bold text-slate-700">Escala de comisiones sobre utilidad bruta</h2>
+        <p className="mb-3 text-xs text-slate-400">
+          El % de comisión del vendedor se calcula según en qué rango cae el % de margen de utilidad de cada cotización (utilidad ÷ venta total). Los porcentajes se escriben como fracción (ej. 0.09 = 9%).
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                <th className="py-2 pr-2">Rango</th>
+                <th className="py-2 pr-2">Desde % margen</th>
+                <th className="py-2 pr-2">Hasta % margen</th>
+                <th className="py-2 pr-2">% Comisión</th>
+                <th className="py-2 pr-2">Observación</th>
+              </tr>
+            </thead>
+            <tbody>
+              {escalas.map((e) => (
+                <tr key={e.rango} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 pr-2 font-semibold">{e.rango}</td>
+                  <td className="py-2 pr-2">
+                    <input type="number" step="0.0001" className="input" value={e.desde_pct}
+                           onChange={(ev) => setEscala(e.rango, { desde_pct: Number(ev.target.value) })} />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input type="number" step="0.0001" className="input" value={e.hasta_pct ?? ''} placeholder="En adelante"
+                           onChange={(ev) => setEscala(e.rango, { hasta_pct: ev.target.value === '' ? null : Number(ev.target.value) })} />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input type="number" step="0.0001" className="input" value={e.porcentaje_comision}
+                           onChange={(ev) => setEscala(e.rango, { porcentaje_comision: Number(ev.target.value) })} />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <input className="input" value={e.observacion ?? ''} onChange={(ev) => setEscala(e.rango, { observacion: ev.target.value })} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button disabled={guardandoEscalas} className="btn btn-secondary mt-3" onClick={guardarEscalas}>
+          {guardandoEscalas ? 'Guardando…' : 'Guardar escala de comisiones'}
+        </button>
       </div>
 
       <div className="card">
