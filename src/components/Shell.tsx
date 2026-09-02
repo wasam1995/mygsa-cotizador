@@ -19,9 +19,11 @@ const NAV: NavItem[] = [
   { href: '/cotizaciones/nueva', label: 'Nueva cotización', icon: '➕', permiso: 'COTIZACIONES_CREAR' },
   { href: '/inventario', label: 'Inventario', icon: '📦', permiso: 'INVENTARIO_VER' },
   { href: '/inventario/kardex', label: 'Kardex', icon: '📊', permiso: 'INVENTARIO_VER' },
+  { href: '/clientes', label: 'Clientes', icon: '🧑‍💼' },
   { href: '/comisiones', label: 'Comisiones', icon: '💰' },
   { href: '/reportes', label: 'Reportes', icon: '📈', permiso: 'REPORTES_VER' },
   { href: '/usuarios', label: 'Usuarios y roles', icon: '👤', permiso: 'USUARIOS_ADMINISTRAR' },
+  { href: '/auditoria', label: 'Bitácora', icon: '📜', permiso: 'AUDITORIA_VER' },
   { href: '/parametros', label: 'Parámetros', icon: '⚙️', permiso: 'PARAMETROS_EDITAR' },
 ];
 
