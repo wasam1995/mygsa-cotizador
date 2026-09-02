@@ -16,13 +16,15 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   if (!cotizacion) return NextResponse.json({ error: 'No encontrada' }, { status: 404 });
 
-  const [{ data: lineas }, { data: costosOperativos }] = await Promise.all([
+  const [{ data: lineas }, { data: costosOperativos }, { data: parametros }] = await Promise.all([
     supabase.from('cotizacion_detalle').select('*').eq('cotizacion_id', params.id).order('linea'),
     supabase.from('cotizacion_costos_operativos').select('*').eq('cotizacion_id', params.id).order('orden'),
+    supabase.from('parametros_fiscales').select('iva_porcentaje, retencion_iva_porcentaje').eq('id', 1).single(),
   ]);
 
   const c = cotizacion as any;
   const esRetenedor = c.cliente_es_retenedor_iva ? 'Sí' : 'No';
+  const retencionIvaPct = Number((parametros as any)?.retencion_iva_porcentaje ?? 0.15);
 
   // --- Hoja "Detalle": el Subtotal y el Costo total de línea se calculan con fórmulas
   // reales de Excel (multiplicación de columnas), no con el valor ya calculado en la
@@ -86,10 +88,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   };
 
   // --- Hoja "Resumen": texto/número simple para la mayoría de filas; las filas
-  // calculadas (Retención IVA condicional, Costo total de operación, Utilidad bruta, %
-  // margen, Comisión, Ganancia neta) llevan fórmulas reales que se agregan más abajo,
-  // referenciando la celda B8 ("Cliente retenedor de IVA: Sí/No") como ejemplo de
-  // cálculo condicional de impuestos.
+  // calculadas (Retención IVA condicional, Costo total de operación, Utilidad bruta,
+  // Utilidad neta, % margen, Comisión, Ganancia neta) llevan fórmulas reales que se
+  // agregan más abajo, referenciando la celda B8 ("Cliente retenedor de IVA: Sí/No")
+  // como ejemplo de cálculo condicional de impuestos. Modelo financiero Etapa 5:
+  // Utilidad Bruta = Venta Neta Base (sin IVA) - Costo de operación; Utilidad Neta =
+  // Utilidad Bruta - ISR (base real de la comisión).
   const resumenFilas: { campo: string; valor: unknown }[] = [
     { campo: 'No. Interno', valor: c.numero_interno },
     { campo: 'No. ERP', valor: c.numero_sistema_externo ?? '' },
@@ -98,24 +102,26 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     { campo: 'Cliente', valor: c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '' },
     { campo: 'Vendedor', valor: c.vendedor?.nombre_completo ?? '' },
     { campo: 'Cliente retenedor de IVA', valor: esRetenedor }, // fila 8
-    { campo: 'Subtotal (con IVA)', valor: Number(c.subtotal) }, // fila 9
-    { campo: 'Descuentos', valor: Number(c.total_descuentos) }, // fila 10
-    { campo: 'Base gravable (sin IVA)', valor: Number(c.base_gravable) }, // fila 11
-    { campo: 'IVA (12%)', valor: Number(c.iva_monto) }, // fila 12
-    { campo: 'Total cotizado (con IVA)', valor: Number(c.total_cotizado) }, // fila 13
-    { campo: 'Retención ISR', valor: Number(c.isr_retencion) }, // fila 14
-    { campo: 'Retención IVA (calculada)', valor: 0 }, // fila 15 — se reemplaza por fórmula
-    { campo: 'Pago neto a la empresa (calculado)', valor: 0 }, // fila 16 — fórmula
-    { campo: '— Uso interno —', valor: '' }, // fila 17
-    { campo: 'Costo total de productos/servicios', valor: Number(c.costo_total_productos) }, // fila 18
-    { campo: 'Gastos operativos adicionales', valor: Number(c.costos_operativos_total) }, // fila 19
-    { campo: 'Costo total de operación (calculado)', valor: 0 }, // fila 20 — fórmula
-    { campo: 'Utilidad bruta (calculada)', valor: 0 }, // fila 21 — fórmula
-    { campo: '% Margen de utilidad (calculado)', valor: 0 }, // fila 22 — fórmula
-    { campo: 'Escala de comisión aplicada', valor: c.escala_comision_rango ? `Rango ${c.escala_comision_rango}` : '' }, // fila 23
-    { campo: '% Comisión al vendedor', valor: Number(c.comision_estimada_pct) }, // fila 24
-    { campo: 'Comisión estimada/pagada (calculada)', valor: 0 }, // fila 25 — fórmula
-    { campo: 'Ganancia neta para la empresa (calculada)', valor: 0 }, // fila 26 — fórmula
+    { campo: '% Retención de IVA (parametrizado)', valor: retencionIvaPct }, // fila 9
+    { campo: 'Subtotal (con IVA)', valor: Number(c.subtotal) }, // fila 10
+    { campo: 'Descuentos', valor: Number(c.total_descuentos) }, // fila 11
+    { campo: 'Venta neta base (sin IVA)', valor: Number(c.base_gravable) }, // fila 12
+    { campo: `IVA (${(Number((parametros as any)?.iva_porcentaje ?? 0.12) * 100).toFixed(0)}%)`, valor: Number(c.iva_monto) }, // fila 13
+    { campo: 'Total cotizado (con IVA)', valor: Number(c.total_cotizado) }, // fila 14
+    { campo: 'Retención ISR', valor: Number(c.isr_retencion) }, // fila 15
+    { campo: 'Retención IVA (calculada)', valor: 0 }, // fila 16 — se reemplaza por fórmula
+    { campo: 'Pago neto a la empresa (calculado)', valor: 0 }, // fila 17 — fórmula
+    { campo: '— Uso interno —', valor: '' }, // fila 18
+    { campo: 'Costo total de productos/servicios', valor: Number(c.costo_total_productos) }, // fila 19
+    { campo: 'Gastos operativos adicionales', valor: Number(c.costos_operativos_total) }, // fila 20
+    { campo: 'Costo total de operación (calculado)', valor: 0 }, // fila 21 — fórmula
+    { campo: 'Utilidad bruta (calculada)', valor: 0 }, // fila 22 — fórmula
+    { campo: 'Utilidad neta (calculada, base de comisión)', valor: 0 }, // fila 23 — fórmula
+    { campo: '% Margen de utilidad neta (calculado)', valor: 0 }, // fila 24 — fórmula
+    { campo: 'Escala de comisión aplicada', valor: c.escala_comision_rango ? `Rango ${c.escala_comision_rango}` : '' }, // fila 25
+    { campo: '% Comisión al vendedor', valor: Number(c.comision_estimada_pct) }, // fila 26
+    { campo: 'Comisión estimada/pagada (calculada)', valor: 0 }, // fila 27 — fórmula
+    { campo: 'Ganancia neta para la empresa (calculada)', valor: 0 }, // fila 28 — fórmula
   ];
 
   const hojaResumen: HojaExcel = {
@@ -136,17 +142,19 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     wsResumen[`B${fila}`] = { t: 'n', f, z: formato };
   };
 
-  [9, 10, 11, 12, 13, 14, 18, 19].forEach(celdaMoneda);
-  celdaPorcentaje(24);
+  [10, 11, 12, 13, 14, 15, 19, 20].forEach(celdaMoneda);
+  celdaPorcentaje(9);
+  celdaPorcentaje(26);
   // Cálculo condicional de impuestos: si el cliente es retenedor de IVA (B8 = "Sí"), se
-  // retiene el 12% del IVA de la cotización; si no, la retención es 0.
-  celdaFormula(15, 'IF(B8="Sí",B12*0.12,0)', FORMATO_MONEDA);
-  celdaFormula(16, 'B13-B14-B15', FORMATO_MONEDA);
-  celdaFormula(20, 'B18+B19', FORMATO_MONEDA);
-  celdaFormula(21, 'B13-B20', FORMATO_MONEDA);
-  celdaFormula(22, 'IF(B13=0,0,B21/B13)', FORMATO_PORCENTAJE);
-  celdaFormula(25, 'B21*B24', FORMATO_MONEDA);
-  celdaFormula(26, 'B21-B25', FORMATO_MONEDA);
+  // retiene el % parametrizado (B9) del IVA de la cotización; si no, la retención es 0.
+  celdaFormula(16, 'IF(B8="Sí",B13*B9,0)', FORMATO_MONEDA);
+  celdaFormula(17, 'B14-B15-B16', FORMATO_MONEDA);
+  celdaFormula(21, 'B19+B20', FORMATO_MONEDA);
+  celdaFormula(22, 'B12-B21', FORMATO_MONEDA); // Utilidad bruta = venta neta base - costo operación
+  celdaFormula(23, 'B22-B15', FORMATO_MONEDA); // Utilidad neta = utilidad bruta - ISR
+  celdaFormula(24, 'IF(B12=0,0,B23/B12)', FORMATO_PORCENTAJE);
+  celdaFormula(27, 'B23*B26', FORMATO_MONEDA); // Comisión = utilidad neta x % de la escala
+  celdaFormula(28, 'B23-B27', FORMATO_MONEDA);
 
   const buffer = libroABuffer(libro);
   const nombreArchivo = `cotizacion_${(c.numero_sistema_externo || c.numero_interno).replace(/[^a-zA-Z0-9-]/g, '_')}.xlsx`;
