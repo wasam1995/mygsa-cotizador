@@ -7,12 +7,21 @@ import PrintQuote from '@/components/PrintQuote';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
 import { cambiarEstado, eliminarCotizacion, subirPdfCotizacion, obtenerUrlAdjunto } from './actions';
-import type { Cotizacion, CotizacionAdjunto, CotizacionCostoOperativo, CotizacionDetalle, CotizacionHistorialEstado, ParametrosFiscales } from '@/lib/types';
+import type { Cotizacion, CotizacionAdjunto, CotizacionCostoOperativo, CotizacionDetalle, CotizacionHistorialEstado, MovimientoInventario, ParametrosFiscales } from '@/lib/types';
 
 type Tab = 'interno' | 'impresion';
 
+const TIPO_COLOR: Record<string, string> = {
+  ENTRADA: 'bg-emerald-100 text-emerald-700',
+  SALIDA: 'bg-red-100 text-red-700',
+  RESERVA: 'bg-amber-100 text-amber-700',
+  LIBERA_RESERVA: 'bg-slate-100 text-slate-600',
+  ANULACION: 'bg-orange-100 text-orange-700',
+  AJUSTE: 'bg-sky-100 text-sky-700',
+};
+
 export default function DetalleClient({
-  cotizacion, lineas, historial, adjuntos, costosOperativos, parametros, permisos, esCreador,
+  cotizacion, lineas, historial, adjuntos, costosOperativos, movimientos, parametros, permisos, esCreador,
   clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
 }: {
   cotizacion: Cotizacion;
@@ -20,6 +29,7 @@ export default function DetalleClient({
   historial: CotizacionHistorialEstado[];
   adjuntos: CotizacionAdjunto[];
   costosOperativos: CotizacionCostoOperativo[];
+  movimientos: (MovimientoInventario & { producto: { codigo: string; nombre: string } | null })[];
   parametros: ParametrosFiscales;
   permisos: string[];
   esCreador: boolean;
@@ -40,6 +50,8 @@ export default function DetalleClient({
   const [subiendo, setSubiendo] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [mostrarConfirmarEliminar, setMostrarConfirmarEliminar] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const puedeAnular = permisos.includes('COTIZACIONES_ANULAR') || (esCreador && cotizacion.estado === 'PROSPECTO');
   const puedeAutorizar = permisos.includes('COTIZACIONES_AUTORIZAR');
@@ -83,6 +95,48 @@ export default function DetalleClient({
     if (url) window.open(url, '_blank');
   }
 
+  // Genera un PDF real (descargable) a partir de la vista de impresión, capturándola
+  // como imagen con html2canvas y armando el archivo con jsPDF. El nodo de PrintQuote
+  // siempre está montado (visible en la pestaña "Vista de impresión", o fuera de
+  // pantalla si el usuario está en "Resumen interno"), así que no hace falta cambiar
+  // de pestaña para capturarlo.
+  async function handleDescargarPDF() {
+    setError(null);
+    setGenerandoPdf(true);
+    try {
+      const nodo = printRef.current;
+      if (!nodo) throw new Error('No se pudo preparar la vista para exportar.');
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const canvas = await html2canvas(nodo, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let alturaRestante = imgHeight;
+      let posicion = 0;
+      pdf.addImage(imgData, 'PNG', 0, posicion, imgWidth, imgHeight);
+      alturaRestante -= pageHeight;
+      while (alturaRestante > 0) {
+        posicion = alturaRestante - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, posicion, imgWidth, imgHeight);
+        alturaRestante -= pageHeight;
+      }
+      pdf.save(`${(cotizacion.numero_sistema_externo || cotizacion.numero_interno).replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`);
+    } catch (e) {
+      setError('No se pudo generar el PDF. Intente de nuevo o use "Imprimir" del navegador.');
+    } finally {
+      setGenerandoPdf(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
@@ -94,7 +148,11 @@ export default function DetalleClient({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge estado={cotizacion.estado} />
-          <button onClick={() => window.print()} className="btn btn-secondary">🖨️ Imprimir / PDF</button>
+          <button onClick={() => window.print()} className="btn btn-secondary">🖨️ Imprimir</button>
+          <button onClick={handleDescargarPDF} disabled={generandoPdf} className="btn btn-secondary">
+            {generandoPdf ? 'Generando…' : '⬇️ Descargar PDF'}
+          </button>
+          <a href={`/api/cotizaciones/${cotizacion.id}/excel`} className="btn btn-secondary">⬇️ Excel</a>
           {puedeModificarOEliminar && (
             <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">✏️ Modificar</Link>
           )}
@@ -299,14 +357,53 @@ export default function DetalleClient({
               </ul>
             </div>
           </div>
+
+          {movimientos.length > 0 && (
+            <div className="card overflow-x-auto">
+              <h2 className="mb-3 text-sm font-bold text-slate-700">Movimientos de inventario generados por esta cotización</h2>
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                    <th className="py-2 pr-2">Fecha</th><th className="py-2 pr-2">Tipo</th>
+                    <th className="py-2 pr-2">Producto</th><th className="py-2 pr-2">Cant.</th>
+                    <th className="py-2 pr-2">Stock result.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movimientos.map((m) => (
+                    <tr key={m.id} className="border-b border-slate-100 last:border-0">
+                      <td className="py-2 pr-2 text-slate-500">{formatFecha(m.creado_en)}</td>
+                      <td className="py-2 pr-2"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TIPO_COLOR[m.tipo]}`}>{m.tipo}</span></td>
+                      <td className="py-2 pr-2">{m.producto?.codigo} — {m.producto?.nombre}</td>
+                      <td className="py-2 pr-2 font-medium">{m.cantidad}</td>
+                      <td className="py-2 pr-2 text-slate-500">{m.stock_resultante ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-2 text-xs text-slate-400">
+                Ver el kardex completo en <Link href={`/inventario/kardex?cotizacion=${encodeURIComponent(cotizacion.numero_sistema_externo || cotizacion.numero_interno)}`} className="text-navy-600 hover:underline">Inventario → Kardex</Link>.
+              </p>
+            </div>
+          )}
         </div>
-      ) : (
+      ) : null}
+
+      {/* El nodo de impresión siempre está montado para que "Descargar PDF" funcione
+          sin importar la pestaña activa: visible en "Vista de impresión", o fuera de
+          pantalla (nunca con display:none, que html2canvas no puede capturar) si el
+          usuario está viendo "Resumen interno". */}
+      <div
+        ref={printRef}
+        className={tab === 'impresion' ? '' : 'no-print pointer-events-none fixed -left-[9999px] top-0'}
+        aria-hidden={tab !== 'impresion'}
+      >
         <PrintQuote
           cotizacion={cotizacion} lineas={lineas} parametros={parametros}
           clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
           clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
         />
-      )}
+      </div>
     </div>
   );
 }
