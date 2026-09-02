@@ -115,6 +115,7 @@ export async function actualizarCotizacionCompleta(cotizacionId: string, payload
     descuento_global_monto: payload.descuento_global_monto,
     comentario: payload.comentario,
     numero_sistema_externo: payload.numero_sistema_externo,
+    plantilla_id: payload.plantilla_id,
     prorratear_costos_operativos: payload.prorratear_costos_operativos,
     mostrar_precios_unitarios_cliente: payload.mostrar_precios_unitarios_cliente,
     mostrar_vendedor_cliente: payload.mostrar_vendedor_cliente,

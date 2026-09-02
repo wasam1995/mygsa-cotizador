@@ -1,13 +1,15 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import PrintQuote from '@/components/PrintQuote';
+import PrintQuoteInterno from '@/components/PrintQuoteInterno';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
+import { distribuirCostosOperativosPorLinea } from '@/lib/fiscal';
 import { cambiarEstado, eliminarCotizacion, subirPdfCotizacion, obtenerUrlAdjunto } from './actions';
-import type { Cotizacion, CotizacionAdjunto, CotizacionCostoOperativo, CotizacionDetalle, CotizacionHistorialEstado, MovimientoInventario, ParametrosFiscales } from '@/lib/types';
+import type { Cotizacion, CotizacionAdjunto, CotizacionCostoOperativo, CotizacionDetalle, CotizacionHistorialEstado, MovimientoInventario, ParametrosFiscales, PlantillaCotizacion } from '@/lib/types';
 
 type Tab = 'interno' | 'impresion';
 
@@ -21,7 +23,7 @@ const TIPO_COLOR: Record<string, string> = {
 };
 
 export default function DetalleClient({
-  cotizacion, lineas, historial, adjuntos, costosOperativos, movimientos, parametros, permisos, esCreador,
+  cotizacion, lineas, historial, adjuntos, costosOperativos, movimientos, parametros, plantilla, permisos, esCreador,
   clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
 }: {
   cotizacion: Cotizacion;
@@ -31,6 +33,7 @@ export default function DetalleClient({
   costosOperativos: CotizacionCostoOperativo[];
   movimientos: (MovimientoInventario & { producto: { codigo: string; nombre: string } | null })[];
   parametros: ParametrosFiscales;
+  plantilla: PlantillaCotizacion | null;
   permisos: string[];
   esCreador: boolean;
   clienteNombre: string;
@@ -50,8 +53,19 @@ export default function DetalleClient({
   const [subiendo, setSubiendo] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [mostrarConfirmarEliminar, setMostrarConfirmarEliminar] = useState(false);
-  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState<'cliente' | 'interno' | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const printRefInterno = useRef<HTMLDivElement>(null);
+
+  const puedeVerInterno = permisos.includes('COTIZACIONES_CREAR') || permisos.includes('COTIZACIONES_VER_TODAS');
+
+  // Reparto de los costos operativos adicionales entre las líneas de producto, en
+  // proporción a su venta — solo se muestra si la cotización se guardó con la opción de
+  // prorratear activada (ver checkbox "Prorratear" en el formulario de captura).
+  const prorrateoPorLinea = useMemo(
+    () => distribuirCostosOperativosPorLinea(lineas, cotizacion.costos_operativos_total),
+    [lineas, cotizacion.costos_operativos_total]
+  );
 
   const puedeAnular = permisos.includes('COTIZACIONES_ANULAR') || (esCreador && cotizacion.estado === 'PROSPECTO');
   const puedeAutorizar = permisos.includes('COTIZACIONES_AUTORIZAR');
@@ -95,16 +109,16 @@ export default function DetalleClient({
     if (url) window.open(url, '_blank');
   }
 
-  // Genera un PDF real (descargable) a partir de la vista de impresión, capturándola
-  // como imagen con html2canvas y armando el archivo con jsPDF. El nodo de PrintQuote
-  // siempre está montado (visible en la pestaña "Vista de impresión", o fuera de
-  // pantalla si el usuario está en "Resumen interno"), así que no hace falta cambiar
-  // de pestaña para capturarlo.
-  async function handleDescargarPDF() {
+  // Genera un PDF real (descargable) a partir de una vista de impresión (cliente o
+  // interna), capturándola como imagen con html2canvas y armando el archivo con jsPDF
+  // en A4 vertical. Ambos nodos (PrintQuote y PrintQuoteInterno) siempre están montados
+  // — visibles solo cuando corresponde, o fuera de pantalla en caso contrario — así que
+  // no hace falta cambiar de pestaña para capturarlos.
+  async function handleDescargarPDF(version: 'cliente' | 'interno') {
     setError(null);
-    setGenerandoPdf(true);
+    setGenerandoPdf(version);
     try {
-      const nodo = printRef.current;
+      const nodo = version === 'interno' ? printRefInterno.current : printRef.current;
       if (!nodo) throw new Error('No se pudo preparar la vista para exportar.');
 
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -114,7 +128,7 @@ export default function DetalleClient({
 
       const canvas = await html2canvas(nodo, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
@@ -129,11 +143,12 @@ export default function DetalleClient({
         pdf.addImage(imgData, 'PNG', 0, posicion, imgWidth, imgHeight);
         alturaRestante -= pageHeight;
       }
-      pdf.save(`${(cotizacion.numero_sistema_externo || cotizacion.numero_interno).replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`);
+      const base = (cotizacion.numero_sistema_externo || cotizacion.numero_interno).replace(/[^a-zA-Z0-9-]/g, '_');
+      pdf.save(version === 'interno' ? `${base}_INTERNO.pdf` : `${base}.pdf`);
     } catch (e) {
       setError('No se pudo generar el PDF. Intente de nuevo o use "Imprimir" del navegador.');
     } finally {
-      setGenerandoPdf(false);
+      setGenerandoPdf(null);
     }
   }
 
@@ -149,9 +164,14 @@ export default function DetalleClient({
         <div className="flex items-center gap-2">
           <StatusBadge estado={cotizacion.estado} />
           <button onClick={() => window.print()} className="btn btn-secondary">🖨️ Imprimir</button>
-          <button onClick={handleDescargarPDF} disabled={generandoPdf} className="btn btn-secondary">
-            {generandoPdf ? 'Generando…' : '⬇️ Descargar PDF'}
+          <button onClick={() => handleDescargarPDF('cliente')} disabled={generandoPdf !== null} className="btn btn-secondary">
+            {generandoPdf === 'cliente' ? 'Generando…' : '⬇️ PDF cliente'}
           </button>
+          {puedeVerInterno && (
+            <button onClick={() => handleDescargarPDF('interno')} disabled={generandoPdf !== null} className="btn btn-secondary">
+              {generandoPdf === 'interno' ? 'Generando…' : '⬇️ PDF interno'}
+            </button>
+          )}
           <a href={`/api/cotizaciones/${cotizacion.id}/excel`} className="btn btn-secondary">⬇️ Excel</a>
           {puedeModificarOEliminar && (
             <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">✏️ Modificar</Link>
@@ -259,10 +279,13 @@ export default function DetalleClient({
                   <th className="py-2 pr-2">Código</th><th className="py-2 pr-2">Descripción</th>
                   <th className="py-2 pr-2">Cant.</th><th className="py-2 pr-2">Costo U.</th>
                   <th className="py-2 pr-2">Precio U.</th><th className="py-2 pr-2">Subtotal</th>
+                  {cotizacion.prorratear_costos_operativos && (
+                    <th className="py-2 pr-2">Costos oper. prorrateados</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
-                {lineas.map((l) => (
+                {lineas.map((l, idx) => (
                   <tr key={l.id} className="border-b border-slate-100 last:border-0">
                     <td className="py-2 pr-2 font-mono text-xs text-slate-500">{l.codigo_mostrado}</td>
                     <td className="py-2 pr-2">{l.descripcion}</td>
@@ -270,10 +293,19 @@ export default function DetalleClient({
                     <td className="py-2 pr-2 text-slate-500">{formatQ(l.costo_unitario)}</td>
                     <td className="py-2 pr-2">{formatQ(l.precio_unitario)}</td>
                     <td className="py-2 pr-2 font-medium">{formatQ(l.subtotal_linea)}</td>
+                    {cotizacion.prorratear_costos_operativos && (
+                      <td className="py-2 pr-2 text-amber-700">{formatQ(prorrateoPorLinea[idx] ?? 0)}</td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
+            {cotizacion.prorratear_costos_operativos && (
+              <p className="mt-2 text-xs text-slate-400">
+                Los costos operativos adicionales ({formatQ(cotizacion.costos_operativos_total)}) se reparten aquí en
+                proporción a la venta de cada línea — es solo informativo, no cambia la utilidad total ya calculada.
+              </p>
+            )}
           </div>
 
           {costosOperativos.length > 0 && (
@@ -399,11 +431,24 @@ export default function DetalleClient({
         aria-hidden={tab !== 'impresion'}
       >
         <PrintQuote
-          cotizacion={cotizacion} lineas={lineas} parametros={parametros}
+          cotizacion={cotizacion} lineas={lineas} parametros={parametros} plantilla={plantilla}
           clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
           clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
         />
       </div>
+
+      {/* Versión interna (confidencial) — solo se usa para generar el "PDF interno";
+          nunca se muestra en pantalla, así que siempre queda fuera de pantalla. */}
+      {puedeVerInterno && (
+        <div ref={printRefInterno} className="no-print pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">
+          <PrintQuoteInterno
+            cotizacion={cotizacion} lineas={lineas} costosOperativos={costosOperativos}
+            prorrateoPorLinea={prorrateoPorLinea} parametros={parametros} plantilla={plantilla}
+            clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
+            clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
+          />
+        </div>
+      )}
     </div>
   );
 }
