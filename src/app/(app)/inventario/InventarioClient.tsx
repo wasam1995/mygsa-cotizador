@@ -23,7 +23,10 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input className="input max-w-xs" placeholder="Buscar código o nombre…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-        {puedeEditar && <button className="btn btn-orange" onClick={() => setMostrarNuevo(true)}>+ Nuevo producto</button>}
+        <div className="flex gap-2">
+          <a href="/api/inventario/excel" className="btn btn-secondary">⬇️ Exportar Excel</a>
+          {puedeEditar && <button className="btn btn-orange" onClick={() => setMostrarNuevo(true)}>+ Nuevo producto</button>}
+        </div>
       </div>
 
       {mostrarNuevo && <NuevoProductoForm onClose={() => { setMostrarNuevo(false); router.refresh(); }} />}
