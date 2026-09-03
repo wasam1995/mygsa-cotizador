@@ -49,7 +49,21 @@ export default function PrintQuote({
   const tituloTabla = plantilla?.titulo_tabla_items || 'DETALLE DE PRODUCTOS Y SERVICIOS';
   const firmaEmisor = plantilla?.texto_firma_emisor || 'Autorizado por (Asesor)';
   const firmaCliente = plantilla?.texto_firma_cliente || 'Aceptado por (Cliente / Fecha)';
+  // Cada apartado de la plantilla se imprime en el punto del documento que se eligió al
+  // crearlo (ver PosicionApartado) — si no tiene posición asignada (plantillas guardadas
+  // antes de esta opción), se imprime donde siempre se imprimió: justo antes de las
+  // condiciones comerciales.
   const apartados = plantilla?.apartados ?? [];
+  const apartadosPor = (pos: NonNullable<typeof apartados[number]['posicion']>) =>
+    apartados.filter((ap) => (ap.posicion ?? 'antes_condiciones') === pos);
+  const renderApartados = (lista: typeof apartados) => lista.map((ap, idx) => (
+    (ap.titulo || ap.contenido) ? (
+      <View key={`${ap.titulo}-${idx}`} style={[s.apartado, { borderColor: pal.borde }]} wrap={false}>
+        {ap.titulo && <Text style={s.apartadoTitulo}>{ap.titulo.toUpperCase()}</Text>}
+        <Text style={s.textoGrisOscuro}>{ap.contenido}</Text>
+      </View>
+    ) : null
+  ));
 
   return (
     <Document title={`Cotización ${cotizacion.numero_sistema_externo || cotizacion.numero_interno}`}>
@@ -120,6 +134,8 @@ export default function PrintQuote({
           </View>
         )}
 
+        {renderApartados(apartadosPor('antes_tabla'))}
+
         {/* Tabla de ítems */}
         <Text style={[s.seccionTitulo, { color: pal.primario }]}>{tituloTabla}</Text>
         <View style={[s.tablaHead, { borderColor: pal.acento }]}>
@@ -153,6 +169,8 @@ export default function PrintQuote({
           <Text style={s.notaSinPrecios}>Precios detallados por artículo omitidos — se muestra el precio total del paquete.</Text>
         )}
 
+        {renderApartados(apartadosPor('antes_totales'))}
+
         {/* Totales alineados a la derecha */}
         <View style={s.filaTotales} wrap={false}>
           <View style={s.cajaLetras}>
@@ -171,15 +189,7 @@ export default function PrintQuote({
           </View>
         </View>
 
-        {/* Apartados adicionales de la plantilla */}
-        {apartados.map((ap, idx) => (
-          ap.titulo || ap.contenido ? (
-            <View key={idx} style={[s.apartado, { borderColor: pal.borde }]} wrap={false}>
-              {ap.titulo && <Text style={s.apartadoTitulo}>{ap.titulo.toUpperCase()}</Text>}
-              <Text style={s.textoGrisOscuro}>{ap.contenido}</Text>
-            </View>
-          ) : null
-        ))}
+        {renderApartados(apartadosPor('antes_condiciones'))}
 
         {/* Términos y condiciones */}
         <View style={[s.cuadroAcento, { borderColor: pal.acento, backgroundColor: pal.fondo, marginTop: 12 }]} wrap={false}>
@@ -188,6 +198,8 @@ export default function PrintQuote({
             <Text key={idx} style={s.textoGrisOscuro}>{idx + 1}. {linea}</Text>
           ))}
         </View>
+
+        {renderApartados(apartadosPor('despues_condiciones'))}
 
         {/* Bloque de firmas */}
         <View style={s.filaFirmas} wrap={false}>
@@ -214,10 +226,10 @@ function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
     marcaAguaCapa: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
     marcaAgua: { fontSize: 56, fontWeight: 700, color: '#ef4444', opacity: 0.35, transform: 'rotate(-25deg)' },
     cabecera: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 12 },
-    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 280 },
-    logo: { width: 52, height: 52, objectFit: 'contain' },
-    logoPlaceholder: { width: 52, height: 52, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-    logoPlaceholderTexto: { color: '#fff', fontSize: 13, fontWeight: 700 },
+    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 320 },
+    logo: { width: 84, height: 84, objectFit: 'contain' },
+    logoPlaceholder: { width: 84, height: 84, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    logoPlaceholderTexto: { color: '#fff', fontSize: 18, fontWeight: 700 },
     emisorNombre: { fontSize: 11, fontWeight: 700, marginBottom: 2 },
     cabeceraFolio: { alignItems: 'flex-end' },
     tituloDoc: { fontSize: 20, fontWeight: 700, marginBottom: 3 },
@@ -249,7 +261,7 @@ function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
     filaTotal: { flexDirection: 'row', justifyContent: 'space-between', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 6, marginTop: 2 },
     apartado: { marginTop: 12, borderTopWidth: 1, paddingTop: 8 },
     apartadoTitulo: { fontWeight: 700, color: '#334155', fontSize: 8.5, marginBottom: 3 },
-    filaFirmas: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 40, gap: 24 },
+    filaFirmas: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 64, gap: 48 },
     firma: { flex: 1, borderTopWidth: 1, borderTopColor: '#94a3b8', paddingTop: 6, textAlign: 'center' },
     firmaTexto: { color: '#64748b', fontSize: 8.5 },
     leyendaPie: { marginTop: 20, borderTopWidth: 1, borderStyle: 'dashed', paddingTop: 10, textAlign: 'center', color: '#64748b', fontSize: 7.5, lineHeight: 1.5 },

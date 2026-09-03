@@ -30,6 +30,21 @@ export default function PrintQuoteInterno({
   const pal = paletaPdf(parametros);
   const s = crearEstilos(pal);
 
+  // Mismo esquema de posiciones que la versión cliente (ver PrintQuote.tsx) — cada
+  // apartado se imprime donde se eligió al crearlo; sin posición asignada, se imprime
+  // donde siempre se imprimió: justo antes de las condiciones comerciales.
+  const apartados = plantilla?.apartados ?? [];
+  const apartadosPor = (pos: NonNullable<typeof apartados[number]['posicion']>) =>
+    apartados.filter((ap) => (ap.posicion ?? 'antes_condiciones') === pos);
+  const renderApartados = (lista: typeof apartados) => lista.map((ap, idx) => (
+    (ap.titulo || ap.contenido) ? (
+      <View key={`${ap.titulo}-${idx}`} style={[s.apartado, { borderColor: pal.borde }]} wrap={false}>
+        {ap.titulo && <Text style={s.apartadoTitulo}>{ap.titulo.toUpperCase()}</Text>}
+        <Text style={s.textoGrisOscuro}>{ap.contenido}</Text>
+      </View>
+    ) : null
+  ));
+
   return (
     <Document title={`Cotización interna ${cotizacion.numero_sistema_externo || cotizacion.numero_interno}`}>
       <Page size="A4" style={s.page}>
@@ -79,6 +94,8 @@ export default function PrintQuoteInterno({
           </View>
         </View>
 
+        {renderApartados(apartadosPor('antes_tabla'))}
+
         <View style={[s.tablaHead, { borderColor: pal.acento, marginTop: 16 }]}>
           <Text style={s.colArticulo}>Artículo / servicio</Text>
           <Text style={s.colCant}>Cant.</Text>
@@ -124,6 +141,8 @@ export default function PrintQuoteInterno({
           </View>
         )}
 
+        {renderApartados(apartadosPor('antes_totales'))}
+
         <View style={s.filaResumenes} wrap={false}>
           <View style={[s.resumen, { backgroundColor: pal.fondoAlterno }]}>
             <Text style={s.apartadoTitulo}>Resumen fiscal</Text>
@@ -151,14 +170,7 @@ export default function PrintQuoteInterno({
           </View>
         </View>
 
-        {plantilla?.apartados?.map((ap, idx) => (
-          ap.titulo || ap.contenido ? (
-            <View key={idx} style={[s.apartado, { borderColor: pal.borde }]} wrap={false}>
-              {ap.titulo && <Text style={s.apartadoTitulo}>{ap.titulo.toUpperCase()}</Text>}
-              <Text style={s.textoGrisOscuro}>{ap.contenido}</Text>
-            </View>
-          ) : null
-        ))}
+        {renderApartados(apartadosPor('antes_condiciones'))}
 
         {plantilla?.condiciones_comerciales && (
           <View style={[s.cuadroAcento, { borderColor: pal.acento, backgroundColor: pal.fondo }]} wrap={false}>
@@ -168,6 +180,8 @@ export default function PrintQuoteInterno({
             ))}
           </View>
         )}
+
+        {renderApartados(apartadosPor('despues_condiciones'))}
 
         {/* Nota: el estilo de <Page> deliberadamente no lleva "lineHeight" — puesto ahí
             hace que este pie de página fijo deje de pintarse (comportamiento verificado de
@@ -196,10 +210,10 @@ function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
     avisoInterno: { borderRadius: 6, paddingVertical: 5, marginBottom: 12, alignItems: 'center' },
     avisoInternoTexto: { color: '#fff', fontWeight: 700, fontSize: 8, letterSpacing: 1 },
     cabecera: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 12 },
-    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 280 },
-    logo: { width: 52, height: 52, objectFit: 'contain' },
-    logoPlaceholder: { width: 52, height: 52, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-    logoPlaceholderTexto: { color: '#fff', fontSize: 13, fontWeight: 700 },
+    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 320 },
+    logo: { width: 84, height: 84, objectFit: 'contain' },
+    logoPlaceholder: { width: 84, height: 84, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    logoPlaceholderTexto: { color: '#fff', fontSize: 18, fontWeight: 700 },
     emisorNombre: { fontSize: 11, fontWeight: 700, marginBottom: 2 },
     cabeceraFolio: { alignItems: 'flex-end' },
     tituloDoc: { fontSize: 18, fontWeight: 700, marginBottom: 3 },
