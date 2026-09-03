@@ -212,18 +212,30 @@ export default function DetalleClient({
           {puedeModificarOEliminar && (
             <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">✏️ Modificar</Link>
           )}
-          {puedeModificarOEliminar && (
+          {/* Una cotización FACTURADA ya no se puede eliminar directamente (movió inventario
+              real y generó comisión) — hay que anularla primero, desde la tarjeta de
+              Acciones de abajo. Mostrar el botón aquí solo llevaría a un error al hacer clic. */}
+          {puedeModificarOEliminar && cotizacion.estado !== 'FACTURADO' && (
             <button onClick={() => setMostrarConfirmarEliminar(true)} className="btn btn-danger">🗑️ Eliminar</button>
           )}
         </div>
       </div>
 
+      {puedeModificarOEliminar && cotizacion.estado === 'FACTURADO' && (
+        <div className="card no-print border-amber-200 bg-amber-50">
+          <p className="text-sm text-amber-800">
+            Esta cotización ya está facturada. Para eliminarla definitivamente, primero debe <b>anularla</b> (eso
+            devuelve el inventario correctamente y queda registrado en el kardex) — la opción de anular está en
+            &quot;Acciones&quot; más abajo. Una vez anulada, el botón &quot;Eliminar&quot; vuelve a aparecer.
+          </p>
+        </div>
+      )}
+
       {mostrarConfirmarEliminar && (
         <div className="card no-print border-red-200 bg-red-50">
           <p className="text-sm font-bold text-red-700">¿Eliminar esta cotización?</p>
           <p className="mt-1 text-sm text-red-600">
-            Esta acción no se puede deshacer y borra por completo el registro de {cotizacion.numero_interno}
-            {cotizacion.estado === 'FACTURADO' ? ' (ya facturada). Los movimientos de inventario y la comisión ya generados se conservan, pero quedarán sin cotización asociada.' : '.'}
+            Esta acción no se puede deshacer y borra por completo el registro de {cotizacion.numero_interno}.
             {' '}Si solo quiere dejarla sin efecto conservando el registro, use "Anular" en vez de esto.
           </p>
           <div className="mt-3 flex gap-2">
@@ -237,8 +249,10 @@ export default function DetalleClient({
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 no-print">{error}</div>}
 
-      {/* Acciones de flujo de estado */}
-      {cotizacion.estado !== 'FACTURADO' && cotizacion.estado !== 'ANULADO' && (
+      {/* Acciones de flujo de estado — se muestra también en FACTURADO (aunque ya no
+          quedan botones de transición hacia adelante) porque es la única forma de llegar
+          a "Anular" desde ahí, que es el paso obligatorio antes de poder eliminar. */}
+      {cotizacion.estado !== 'ANULADO' && (
         <div className="card no-print">
           <h2 className="mb-3 text-sm font-bold text-slate-700">Acciones</h2>
           <div className="flex flex-wrap gap-2">
@@ -273,8 +287,8 @@ export default function DetalleClient({
           {mostrarAnular && (
             <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
               <p className="text-xs text-red-700">
-                {cotizacion.estado === 'AUTORIZADO_CLIENTE'
-                  ? 'Esta cotización ya rebajó el inventario (el cliente la había aprobado). Al anular, el sistema devuelve automáticamente las unidades a existencia y lo deja registrado en el kardex — no requiere ningún paso adicional.'
+                {cotizacion.estado === 'FACTURADO'
+                  ? 'Esta cotización ya rebajó el inventario (está facturada). Al anular, el sistema devuelve automáticamente las unidades a existencia y lo deja registrado en el kardex — no requiere ningún paso adicional.'
                   : 'Esta cotización todavía no ha rebajado inventario, solo tiene unidades reservadas. Al anular, el sistema libera automáticamente esa reserva.'}
               </p>
               <label className="label">Motivo de anulación</label>

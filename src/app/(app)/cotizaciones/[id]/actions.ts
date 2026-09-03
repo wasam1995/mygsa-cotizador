@@ -122,6 +122,18 @@ export async function actualizarCotizacionCompleta(cotizacionId: string, payload
   }).eq('id', cotizacionId);
   if (errCot) return { error: errCot.message };
 
+  // Si la cotización YA ESTÁ FACTURADA, antes de reemplazar las líneas hay que dejar
+  // registrado en el kardex y aplicado a stock_actual el efecto de la diferencia entre
+  // las cantidades que tenía y las nuevas (agregar producto, subir/bajar cantidad) — el
+  // reemplazo de cotizacion_detalle en sí NO mueve inventario para una cotización
+  // facturada (ver trg_reservar_stock, que no aplica a estados finales). Para cualquier
+  // otro estado esta función no hace nada (el flujo normal de reservas ya se encarga).
+  const { error: errDiferencial } = await supabase.rpc('ajustar_stock_diferencial_facturado', {
+    p_cotizacion_id: cotizacionId,
+    p_lineas: payload.lineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad })),
+  });
+  if (errDiferencial) return { error: `No se pudo ajustar el inventario: ${errDiferencial.message}` };
+
   const { error: errDelDet } = await supabase.from('cotizacion_detalle').delete().eq('cotizacion_id', cotizacionId);
   if (errDelDet) return { error: errDelDet.message };
 
@@ -179,10 +191,16 @@ export async function eliminarCotizacion(cotizacionId: string) {
 
   const esDueno = actual.vendedor_id === sesion.vendedorId;
   const puedeGestionarTodas = sesion.permisos.includes('COTIZACIONES_VER_TODAS');
-  if (actual.estado === 'FACTURADO' && !puedeGestionarTodas) {
-    return { error: 'Esta cotización ya está facturada. Solo un Autorizador o Administrador puede eliminarla.' };
+  if (actual.estado === 'FACTURADO') {
+    // Una cotización facturada ya movió inventario real (stock_actual) y generó una
+    // comisión — eliminarla directamente dejaría esos movimientos "sueltos" sin la
+    // devolución correspondiente. Debe anularse primero (eso sí devuelve el stock y
+    // queda registrado en el kardex); recién entonces se puede eliminar el registro.
+    // La base de datos también bloquea esto (trigger antes_eliminar_cotizacion) como
+    // respaldo — este mensaje es solo para que el error sea claro en la pantalla.
+    return { error: 'Esta cotización ya está facturada — debe anularla primero (eso devuelve el inventario correctamente). Una vez anulada, sí se puede eliminar.' };
   }
-  if (actual.estado !== 'FACTURADO' && !esDueno && !puedeGestionarTodas) {
+  if (!esDueno && !puedeGestionarTodas) {
     return { error: 'No tiene permiso para eliminar esta cotización.' };
   }
 
