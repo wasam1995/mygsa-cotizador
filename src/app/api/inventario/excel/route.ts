@@ -22,6 +22,8 @@ export async function GET() {
     stock_minimo: Number(p.stock_minimo),
     activo: p.activo ? 'Sí' : 'No',
     especificaciones: p.especificaciones ?? '',
+    descripcion: p.descripcion ?? '',
+    proveedor: p.proveedor ?? '',
   }));
 
   const hoja: HojaExcel = {
@@ -39,6 +41,8 @@ export async function GET() {
       { header: 'Stock mínimo', key: 'stock_minimo', tipo: 'entero' },
       { header: 'Activo', key: 'activo', tipo: 'texto' },
       { header: 'Especificaciones', key: 'especificaciones', tipo: 'texto' },
+      { header: 'Descripción', key: 'descripcion', tipo: 'texto' },
+      { header: 'Proveedor', key: 'proveedor', tipo: 'texto' },
     ],
     filas,
     totales: ['stock_actual', 'stock_disponible'],
