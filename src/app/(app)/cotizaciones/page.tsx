@@ -55,7 +55,7 @@ export default async function CotizacionesPage({
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-800">Cotizaciones</h1>
+        <h1 className="page-title">Cotizaciones</h1>
         <div className="flex gap-2">
           <Link href="?vista=bandejas" className={`btn btn-secondary ${!vistaTabla && !soloPendientes ? '!bg-navy-700 !text-white' : ''}`}>🔀 Pipeline</Link>
           <Link href="?vista=tabla" className={`btn btn-secondary ${vistaTabla ? '!bg-navy-700 !text-white' : ''}`}>Tabla</Link>
@@ -87,7 +87,7 @@ export default async function CotizacionesPage({
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+              <tr className="table-head-row">
                 <th className="py-2 pr-3">No.</th>
                 <th className="py-2 pr-3">Fecha</th>
                 <th className="py-2 pr-3">Cliente</th>
@@ -98,7 +98,7 @@ export default async function CotizacionesPage({
             </thead>
             <tbody>
               {lista.map((c) => (
-                <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <tr key={c.id} className="table-row-hover">
                   <td className="py-2.5 pr-3"><Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">{c.numero_interno}</Link></td>
                   <td className="py-2.5 pr-3 text-slate-500">{formatFecha(c.fecha_emision)}</td>
                   <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</td>
@@ -143,7 +143,7 @@ export default async function CotizacionesPage({
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[820px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+              <tr className="table-head-row">
                 <th className="py-2 pr-3">No.</th>
                 <th className="py-2 pr-3">Fecha</th>
                 <th className="py-2 pr-3">Cliente</th>
@@ -154,7 +154,7 @@ export default async function CotizacionesPage({
             </thead>
             <tbody>
               {lista.map((c) => (
-                <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <tr key={c.id} className="table-row-hover">
                   <td className="py-2.5 pr-3"><Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">{c.numero_interno}</Link></td>
                   <td className="py-2.5 pr-3 text-slate-500">{formatFecha(c.fecha_emision)}</td>
                   <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</td>
