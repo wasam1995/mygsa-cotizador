@@ -9,6 +9,11 @@ export function formatFecha(iso: string | null | undefined): string {
   return d.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+export function formatPct(n: number | null | undefined): string {
+  const v = (n ?? 0) * 100;
+  return v.toLocaleString('es-GT', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+
 export function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(' ');
 }
