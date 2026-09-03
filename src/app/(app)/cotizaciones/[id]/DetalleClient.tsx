@@ -127,7 +127,24 @@ export default function DetalleClient({
         import('jspdf'),
       ]);
 
-      const canvas = await html2canvas(nodo, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      // html2canvas tiene un problema conocido con elementos "position: fixed" ubicados
+      // fuera de pantalla (como el nodo de impresión, que vive en left:-9999px para no
+      // interferir con la vista normal): si no se corrige el scroll, termina capturando
+      // el viewport visible completo (menús, botones, tarjetas internas) en vez del
+      // documento real — así es como aparecía información de más y todo diminuto. Se
+      // corrige forzando el scroll a 0,0 antes de capturar y pasando scrollX/scrollY en 0
+      // para que html2canvas recorte exactamente el nodo indicado.
+      window.scrollTo(0, 0);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const canvas = await html2canvas(nodo, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: document.documentElement.clientWidth,
+        windowHeight: document.documentElement.clientHeight,
+      });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
 
@@ -188,7 +205,10 @@ export default function DetalleClient({
               {generandoPdf === 'interno' ? 'Generando…' : '⬇️ PDF interno'}
             </button>
           )}
-          <a href={`/api/cotizaciones/${cotizacion.id}/excel`} className="btn btn-secondary">⬇️ Excel</a>
+          <a href={`/api/cotizaciones/${cotizacion.id}/excel/cliente`} className="btn btn-secondary">⬇️ Excel cliente</a>
+          {puedeVerInterno && (
+            <a href={`/api/cotizaciones/${cotizacion.id}/excel`} className="btn btn-secondary">⬇️ Excel interno</a>
+          )}
           {puedeModificarOEliminar && (
             <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">✏️ Modificar</Link>
           )}
@@ -252,6 +272,11 @@ export default function DetalleClient({
           </div>
           {mostrarAnular && (
             <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="text-xs text-red-700">
+                {cotizacion.estado === 'AUTORIZADO_CLIENTE'
+                  ? 'Esta cotización ya rebajó el inventario (el cliente la había aprobado). Al anular, el sistema devuelve automáticamente las unidades a existencia y lo deja registrado en el kardex — no requiere ningún paso adicional.'
+                  : 'Esta cotización todavía no ha rebajado inventario, solo tiene unidades reservadas. Al anular, el sistema libera automáticamente esa reserva.'}
+              </p>
               <label className="label">Motivo de anulación</label>
               <textarea className="input" rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
               <div className="flex gap-2">
@@ -283,6 +308,8 @@ export default function DetalleClient({
           <div className="card grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <Dato label="Cliente" valor={clienteNombre} />
             <Dato label="Vendedor" valor={vendedorNombre} />
+            <Dato label="Teléfono del vendedor" valor={cotizacion.vendedor_telefono || '—'} />
+            <Dato label="Correo del vendedor" valor={vendedorCorreo || '—'} />
             <Dato label="Fecha emisión" valor={formatFecha(cotizacion.fecha_emision)} />
             <Dato label="Vence" valor={formatFecha(cotizacion.fecha_vencimiento)} />
           </div>
