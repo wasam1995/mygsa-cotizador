@@ -108,7 +108,7 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       {mensaje && <p className="text-sm text-emerald-600">{mensaje}</p>}
 
       <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Impuestos (Guatemala)</h2>
+        <h2 className="mb-3 section-title">Impuestos (Guatemala)</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Campo label="IVA (%)" hint="Ej. 0.12 = 12%">
             <input type="number" step="0.001" className="input" value={form.iva_porcentaje} onChange={(e) => set('iva_porcentaje', Number(e.target.value))} />
@@ -138,7 +138,7 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       </div>
 
       <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Cotizaciones</h2>
+        <h2 className="mb-3 section-title">Cotizaciones</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Campo label="Vigencia de cotización (días)">
             <input type="number" step="1" className="input" value={form.vigencia_dias} onChange={(e) => set('vigencia_dias', Number(e.target.value))} />
@@ -153,14 +153,14 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       </div>
 
       <div className="card">
-        <h2 className="mb-1 text-sm font-bold text-slate-700">Escala de comisiones sobre utilidad bruta</h2>
+        <h2 className="mb-1 section-title">Escala de comisiones sobre utilidad bruta</h2>
         <p className="mb-3 text-xs text-slate-400">
           El % de comisión del vendedor se calcula según en qué rango cae el % de margen de utilidad de cada cotización (utilidad ÷ venta total). Los porcentajes se escriben como fracción (ej. 0.09 = 9%).
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+              <tr className="table-head-row">
                 <th className="py-2 pr-2">Rango</th>
                 <th className="py-2 pr-2">Desde % margen</th>
                 <th className="py-2 pr-2">Hasta % margen</th>
@@ -210,7 +210,7 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       </div>
 
       <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Datos de la empresa</h2>
+        <h2 className="mb-3 section-title">Datos de la empresa</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Campo label="Razón social">
             <input className="input" value={form.razon_social} onChange={(e) => set('razon_social', e.target.value)} />
@@ -234,7 +234,7 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       </div>
 
       <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Leyenda impresa en la cotización</h2>
+        <h2 className="mb-3 section-title">Leyenda impresa en la cotización</h2>
         <p className="mb-2 text-xs text-slate-400">
           Se usa como respaldo solo cuando la cotización no tiene una plantilla asignada. Para la leyenda y las condiciones comerciales que se imprimen normalmente, use el módulo <b>Plantillas</b>.
         </p>
@@ -242,7 +242,7 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       </div>
 
       <div className="card">
-        <h2 className="mb-1 text-sm font-bold text-slate-700">Personalización visual</h2>
+        <h2 className="mb-1 section-title">Personalización visual</h2>
         <p className="mb-3 text-xs text-slate-400">
           Logotipo, colores corporativos y tipografía usados en las cotizaciones impresas / PDF (versión cliente e interna).
         </p>

@@ -15,7 +15,7 @@ export default async function ParametrosPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-slate-800">Parámetros del sistema</h1>
+      <h1 className="mb-1 page-title">Parámetros del sistema</h1>
       <p className="mb-5 text-sm text-slate-500">
         Configuración fiscal (IVA, tramos de ISR), escala de comisiones, datos de la empresa y leyenda impresa en las cotizaciones.
       </p>
