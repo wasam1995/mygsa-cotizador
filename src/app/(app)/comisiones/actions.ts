@@ -72,6 +72,122 @@ export async function crearLiquidacion(payload: {
   return { ok: true, id: liquidacion.id };
 }
 
+// Genera una liquidación por CADA vendedor del grupo, para el mismo rango de fechas —
+// sin descuentos (ISR/IGSS/otros suelen ser distintos por persona): cada liquidación
+// creada así puede editarse individualmente después con actualizarLiquidacion() para
+// aplicarle sus propios descuentos. Los vendedores sin comisiones pendientes en ese
+// rango simplemente se omiten (no es un error).
+export async function crearLiquidacionesGrupo(payload: {
+  numeroBase: string;
+  vendedorIds: string[];
+  fecha_desde: string;
+  fecha_hasta: string;
+}) {
+  const sesion = await requireSesion('COMISIONES_LIQUIDAR');
+  const supabase = createClient();
+
+  if (payload.vendedorIds.length === 0) return { error: 'Seleccione al menos un vendedor.' };
+
+  const numeroPrefijo = /^(.*?)(\d+)$/.exec(payload.numeroBase);
+  const base = numeroPrefijo ? numeroPrefijo[1] : `${payload.numeroBase}-`;
+  const inicio = numeroPrefijo ? Number(numeroPrefijo[2]) : 1;
+  const anchoDigitos = numeroPrefijo ? numeroPrefijo[2].length : 4;
+
+  const creadas: string[] = [];
+  const omitidos: string[] = [];
+  let consecutivo = inicio;
+
+  for (const vendedorId of payload.vendedorIds) {
+    const { data: pendientes, error: errPendientes } = await supabase
+      .from('comisiones_calculadas')
+      .select('id, monto_comision')
+      .eq('vendedor_id', vendedorId)
+      .is('liquidacion_id', null)
+      .gte('fecha_facturacion', payload.fecha_desde)
+      .lte('fecha_facturacion', payload.fecha_hasta);
+
+    if (errPendientes) return { error: `Error al buscar comisiones pendientes: ${errPendientes.message}` };
+    if (!pendientes || pendientes.length === 0) { omitidos.push(vendedorId); continue; }
+
+    const totalComisiones = pendientes.reduce((a, c) => a + Number(c.monto_comision), 0);
+    const numero = `${base}${String(consecutivo).padStart(anchoDigitos, '0')}`;
+    consecutivo += 1;
+
+    const { data: liquidacion, error: errLiq } = await supabase.from('liquidaciones_comisiones').insert({
+      numero,
+      vendedor_id: vendedorId,
+      fecha_desde: payload.fecha_desde,
+      fecha_hasta: payload.fecha_hasta,
+      total_comisiones: totalComisiones,
+      total_neto: totalComisiones,
+      estado: 'PENDIENTE_PAGO',
+      creado_por: sesion.userId,
+    }).select('id').single();
+    if (errLiq || !liquidacion) return { error: errLiq?.message ?? 'No se pudo crear una de las liquidaciones.' };
+
+    const { error: errAsociar } = await supabase
+      .from('comisiones_calculadas')
+      .update({ liquidacion_id: liquidacion.id })
+      .eq('vendedor_id', vendedorId)
+      .is('liquidacion_id', null)
+      .gte('fecha_facturacion', payload.fecha_desde)
+      .lte('fecha_facturacion', payload.fecha_hasta);
+    if (errAsociar) return { error: `Se creó ${numero} pero no se pudieron asociar sus comisiones: ${errAsociar.message}` };
+
+    creadas.push(numero);
+  }
+
+  revalidatePath('/comisiones');
+  return { ok: true, creadas: creadas.length, omitidos: omitidos.length };
+}
+
+// Edita los descuentos (ISR/IGSS/otros) de una liquidación existente y recalcula el
+// neto — solo tiene sentido mientras sigue PENDIENTE_PAGO (una ya PAGADA debe reabrirse
+// primero, para no editar en silencio algo que ya se le pagó al vendedor).
+export async function actualizarLiquidacion(id: string, payload: {
+  descuento_isr: number;
+  justificacion_isr: string | null;
+  descuento_igss: number;
+  justificacion_igss: string | null;
+  descuentos_otros: DescuentoOtro[];
+}) {
+  await requireSesion('COMISIONES_LIQUIDAR');
+  const supabase = createClient();
+
+  const { data: actual, error: errActual } = await supabase
+    .from('liquidaciones_comisiones').select('estado, total_comisiones').eq('id', id).single();
+  if (errActual || !actual) return { error: errActual?.message ?? 'La liquidación ya no existe.' };
+  if (actual.estado === 'PAGADA') return { error: 'Esta liquidación ya está pagada — reábrala primero para poder editar sus descuentos.' };
+
+  const totalOtros = payload.descuentos_otros.reduce((a, d) => a + Number(d.monto || 0), 0);
+  const totalNeto = Number(actual.total_comisiones) - (payload.descuento_isr || 0) - (payload.descuento_igss || 0) - totalOtros;
+
+  const { error } = await supabase.from('liquidaciones_comisiones').update({
+    descuento_isr: payload.descuento_isr || 0,
+    justificacion_isr: payload.descuento_isr > 0 ? (payload.justificacion_isr || null) : null,
+    descuento_igss: payload.descuento_igss || 0,
+    justificacion_igss: payload.descuento_igss > 0 ? (payload.justificacion_igss || null) : null,
+    descuentos_otros: payload.descuentos_otros.filter((d) => d.concepto || d.monto),
+    total_neto: totalNeto,
+  }).eq('id', id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/comisiones');
+  return { ok: true };
+}
+
+// Elimina una liquidación por completo. Las comisiones que tenía asociadas vuelven
+// automáticamente a "pendiente de pago" (comisiones_calculadas.liquidacion_id tiene
+// "on delete set null"), no se pierde ni se borra ninguna comisión.
+export async function eliminarLiquidacion(id: string) {
+  await requireSesion('COMISIONES_LIQUIDAR');
+  const supabase = createClient();
+  const { error } = await supabase.from('liquidaciones_comisiones').delete().eq('id', id);
+  if (error) return { error: error.message };
+  revalidatePath('/comisiones');
+  return { ok: true };
+}
+
 export async function marcarLiquidacionPagada(id: string, comentarioPago: string) {
   const sesion = await requireSesion('COMISIONES_LIQUIDAR');
   const supabase = createClient();
