@@ -11,6 +11,18 @@ const COLUMNAS: EstadoCotizacion[] = [
   'PROSPECTO', 'PEND_AUTORIZAR', 'ENVIADO_CLIENTE', 'AUTORIZADO_CLIENTE', 'FACTURADO', 'ANULADO',
 ];
 
+// Mismo código de color que StatusBadge (ESTADOS_COLOR), pero aplicado al encabezado y al
+// borde izquierdo de cada tarjeta del tablero — así el pipeline se distingue por color de
+// un vistazo, no solo por la columna en la que está.
+const COLUMNA_COLOR: Record<EstadoCotizacion, { header: string; borde: string }> = {
+  PROSPECTO: { header: 'bg-slate-100 text-slate-700', borde: 'border-l-slate-400' },
+  PEND_AUTORIZAR: { header: 'bg-amber-100 text-amber-800', borde: 'border-l-amber-400' },
+  ENVIADO_CLIENTE: { header: 'bg-sky-100 text-sky-800', borde: 'border-l-sky-400' },
+  AUTORIZADO_CLIENTE: { header: 'bg-indigo-100 text-indigo-800', borde: 'border-l-indigo-400' },
+  FACTURADO: { header: 'bg-emerald-100 text-emerald-800', borde: 'border-l-emerald-400' },
+  ANULADO: { header: 'bg-red-100 text-red-700', borde: 'border-l-red-400' },
+};
+
 export default async function CotizacionesPage({
   searchParams,
 }: { searchParams: { vista?: string; q?: string } }) {
@@ -21,7 +33,6 @@ export default async function CotizacionesPage({
   let query = supabase.from('cotizaciones')
     .select('*, cliente:clientes(nombre_razon), vendedor:vendedores(nombre_completo)')
     .order('creado_en', { ascending: false });
-
   if (!verTodas && sesion.vendedorId) query = query.eq('vendedor_id', sesion.vendedorId);
 
   const { data } = await query.limit(400);
@@ -30,6 +41,9 @@ export default async function CotizacionesPage({
     vendedor: { nombre_completo: string } | null;
   })[];
 
+  // "Pendientes de terminar": borradores activos (no anulados/facturados) que aún no
+  // tienen capturado el número de cotización del sistema ERP externo — sin ese dato no
+  // se pueden finalizar (enviar/autorizar/facturar), así que necesitan volver a atenderse.
   const pendientesFinalizar = listaCompleta.filter((c) =>
     !['FACTURADO', 'ANULADO'].includes(c.estado) && (!c.numero_sistema_externo || !c.numero_sistema_externo.trim())
   );
@@ -43,7 +57,7 @@ export default async function CotizacionesPage({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-slate-800">Cotizaciones</h1>
         <div className="flex gap-2">
-          <Link href="?vista=bandejas" className={`btn btn-secondary ${!vistaTabla && !soloPendientes ? '!bg-navy-700 !text-white' : ''}`}>Bandejas</Link>
+          <Link href="?vista=bandejas" className={`btn btn-secondary ${!vistaTabla && !soloPendientes ? '!bg-navy-700 !text-white' : ''}`}>🔀 Pipeline</Link>
           <Link href="?vista=tabla" className={`btn btn-secondary ${vistaTabla ? '!bg-navy-700 !text-white' : ''}`}>Tabla</Link>
           {sesion.permisos.includes('COTIZACIONES_CREAR') && (
             <Link href="/cotizaciones/nueva" className="btn btn-orange">+ Nueva</Link>
@@ -63,7 +77,6 @@ export default async function CotizacionesPage({
         </div>
         <span className="rounded-full bg-amber-500 px-3 py-1 text-sm font-bold text-white">{pendientesFinalizar.length}</span>
       </Link>
-
       {soloPendientes && (
         <p className="mb-4">
           <Link href="?vista=bandejas" className="text-xs font-semibold text-navy-600 hover:underline">← Ver todas las bandejas</Link>
@@ -88,9 +101,9 @@ export default async function CotizacionesPage({
                 <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="py-2.5 pr-3"><Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">{c.numero_interno}</Link></td>
                   <td className="py-2.5 pr-3 text-slate-500">{formatFecha(c.fecha_emision)}</td>
-                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '—'}</td>
-                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo ?? '—'}</td>
-                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado ?? 0)}</td>
+                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</td>
+                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo}</td>
+                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado)}</td>
                   <td className="py-2.5 pr-3"><StatusBadge estado={c.estado} /></td>
                 </tr>
               ))}
@@ -104,20 +117,20 @@ export default async function CotizacionesPage({
             const items = lista.filter((c) => c.estado === estado);
             return (
               <div key={estado} className="w-72 shrink-0">
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{ESTADOS_LABEL[estado]}</p>
-                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{items.length}</span>
+                <div className={`mb-2 flex items-center justify-between rounded-lg px-2 py-1.5 ${COLUMNA_COLOR[estado].header}`}>
+                  <p className="text-xs font-bold uppercase tracking-wide">{ESTADOS_LABEL[estado]}</p>
+                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold">{items.length}</span>
                 </div>
                 <div className="space-y-2">
                   {items.map((c) => (
-                    <Link key={c.id} href={`/cotizaciones/${c.id}`} className="card block !p-3 hover:border-navy-300">
+                    <Link key={c.id} href={`/cotizaciones/${c.id}`} className={`card block !p-3 border-l-4 hover:border-navy-300 ${COLUMNA_COLOR[estado].borde}`}>
                       <p className="text-sm font-bold text-navy-700">{c.numero_interno}</p>
-                      <p className="truncate text-xs text-slate-500">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '—'}</p>
+                      <p className="truncate text-xs text-slate-500">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</p>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-700">{formatQ(c.total_cotizado ?? 0)}</span>
+                        <span className="text-sm font-semibold text-slate-700">{formatQ(c.total_cotizado)}</span>
                         <span className="text-[11px] text-slate-400">{formatFecha(c.fecha_emision)}</span>
                       </div>
-                      {verTodas && <p className="mt-1 text-[11px] text-slate-400">{c.vendedor?.nombre_completo ?? '—'}</p>}
+                      {verTodas && <p className="mt-1 text-[11px] text-slate-400">{c.vendedor?.nombre_completo}</p>}
                     </Link>
                   ))}
                   {items.length === 0 && <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-300">Vacío</p>}
@@ -144,13 +157,12 @@ export default async function CotizacionesPage({
                 <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                   <td className="py-2.5 pr-3"><Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">{c.numero_interno}</Link></td>
                   <td className="py-2.5 pr-3 text-slate-500">{formatFecha(c.fecha_emision)}</td>
-                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '—'}</td>
-                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo ?? '—'}</td>
-                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado ?? 0)}</td>
+                  <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</td>
+                  <td className="py-2.5 pr-3 text-slate-500">{c.vendedor?.nombre_completo}</td>
+                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado)}</td>
                   <td className="py-2.5 pr-3"><StatusBadge estado={c.estado} /></td>
                 </tr>
               ))}
-              {lista.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-slate-400">No hay cotizaciones para mostrar.</td></tr>}
             </tbody>
           </table>
         </div>
