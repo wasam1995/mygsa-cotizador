@@ -189,7 +189,7 @@ export default function DetalleClient({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">{cotizacion.numero_interno}</h1>
+          <h1 className="page-title">{cotizacion.numero_interno}</h1>
           <p className="text-sm text-slate-500">
             {cotizacion.numero_sistema_externo ? `ERP: ${cotizacion.numero_sistema_externo}` : 'Sin número de sistema aún'}
           </p>
@@ -254,7 +254,7 @@ export default function DetalleClient({
           a "Anular" desde ahí, que es el paso obligatorio antes de poder eliminar. */}
       {cotizacion.estado !== 'ANULADO' && (
         <div className="card no-print">
-          <h2 className="mb-3 text-sm font-bold text-slate-700">Acciones</h2>
+          <h2 className="mb-3 section-title">Acciones</h2>
           <div className="flex flex-wrap gap-2">
             {cotizacion.estado === 'PROSPECTO' && puedeGestionar && (
               <button disabled={pendiente} className="btn btn-orange"
@@ -329,10 +329,10 @@ export default function DetalleClient({
           </div>
 
           <div className="card overflow-x-auto">
-            <h2 className="mb-3 text-sm font-bold text-slate-700">Detalle</h2>
+            <h2 className="mb-3 section-title">Detalle</h2>
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                <tr className="table-head-row">
                   <th className="py-2 pr-2">Código</th><th className="py-2 pr-2">Descripción</th>
                   <th className="py-2 pr-2">Cant.</th><th className="py-2 pr-2">Costo U.</th>
                   <th className="py-2 pr-2">Precio U.</th><th className="py-2 pr-2">Subtotal</th>
@@ -367,10 +367,10 @@ export default function DetalleClient({
 
           {costosOperativos.length > 0 && (
             <div className="card overflow-x-auto">
-              <h2 className="mb-3 text-sm font-bold text-slate-700">Costos operativos adicionales (uso interno)</h2>
+              <h2 className="mb-3 section-title">Costos operativos adicionales (uso interno)</h2>
               <table className="w-full min-w-[560px] text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                  <tr className="table-head-row">
                     <th className="py-2 pr-2">Concepto</th><th className="py-2 pr-2">Cant.</th>
                     <th className="py-2 pr-2">Días/tiempos</th><th className="py-2 pr-2">Costo unit.</th><th className="py-2 pr-2">Total</th>
                   </tr>
@@ -392,7 +392,7 @@ export default function DetalleClient({
 
           <div className="card grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
-              <h2 className="mb-2 text-sm font-bold text-slate-700">Resumen fiscal</h2>
+              <h2 className="mb-2 section-title">Resumen fiscal</h2>
               <FilaResumen label="Subtotal (con IVA)" valor={cotizacion.subtotal} />
               <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
               <FilaResumen label="Total cotizado (incluye IVA)" valor={cotizacion.total_cotizado} negrita grande />
@@ -404,7 +404,7 @@ export default function DetalleClient({
               <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita tono="text-emerald-700" />
             </div>
             <div>
-              <h2 className="mb-2 text-sm font-bold text-slate-700">Utilidad y comisión (uso interno)</h2>
+              <h2 className="mb-2 section-title">Utilidad y comisión (uso interno)</h2>
               <FilaResumen label="Costo total de productos/servicios" valor={cotizacion.costo_total_productos} />
               <FilaResumen label="+ Gastos operativos adicionales" valor={cotizacion.costos_operativos_total} />
               <FilaResumen label="= Costo total de operación" valor={cotizacion.costo_total_operacion} negrita />
@@ -422,7 +422,7 @@ export default function DetalleClient({
 
           <div className="card grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
-              <h2 className="mb-2 text-sm font-bold text-slate-700">Adjuntos (PDF del ERP)</h2>
+              <h2 className="mb-2 section-title">Adjuntos (PDF del ERP)</h2>
               <ul className="mb-3 space-y-1">
                 {adjuntos.map((a) => (
                   <li key={a.id}>
@@ -440,7 +440,7 @@ export default function DetalleClient({
                 </button>
               </form>
 
-              <h2 className="mb-2 mt-5 text-sm font-bold text-slate-700">Historial</h2>
+              <h2 className="mb-2 mt-5 section-title">Historial</h2>
               <ul className="space-y-1 text-xs text-slate-500">
                 {historial.map((h) => (
                   <li key={h.id}>{formatFecha(h.creado_en)} — {h.estado_anterior ?? '—'} → <b>{h.estado_nuevo}</b></li>
@@ -451,10 +451,10 @@ export default function DetalleClient({
 
           {movimientos.length > 0 && (
             <div className="card overflow-x-auto">
-              <h2 className="mb-3 text-sm font-bold text-slate-700">Movimientos de inventario generados por esta cotización</h2>
+              <h2 className="mb-3 section-title">Movimientos de inventario generados por esta cotización</h2>
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                  <tr className="table-head-row">
                     <th className="py-2 pr-2">Fecha</th><th className="py-2 pr-2">Tipo</th>
                     <th className="py-2 pr-2">Producto</th><th className="py-2 pr-2">Cant.</th>
                     <th className="py-2 pr-2">Stock result.</th>
