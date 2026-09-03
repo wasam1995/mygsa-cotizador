@@ -102,7 +102,7 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+            <tr className="table-head-row">
               <th className="py-2 pr-2">Código</th><th className="py-2 pr-2">Producto</th>
               <th className="py-2 pr-2">Stock</th><th className="py-2 pr-2">Reservado</th>
               <th className="py-2 pr-2">Disponible</th><th className="py-2 pr-2">Costo</th>
@@ -342,7 +342,7 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="card border-navy-200 bg-navy-50/40">
-      <h3 className="mb-3 text-sm font-bold text-slate-700">Nuevo producto</h3>
+      <h3 className="mb-3 section-title">Nuevo producto</h3>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <input className="input" placeholder="Código (INV-032)" value={codigo} onChange={(e) => setCodigo(e.target.value)} />

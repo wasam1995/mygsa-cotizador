@@ -12,7 +12,7 @@ export default async function InventarioPage() {
 
   return (
     <div>
-      <h1 className="mb-5 text-xl font-bold text-slate-800">Inventario</h1>
+      <h1 className="mb-5 page-title">Inventario</h1>
       <InventarioClient productos={(data ?? []) as Producto[]} puedeEditar={sesion.permisos.includes('INVENTARIO_EDITAR')} />
     </div>
   );
