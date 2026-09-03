@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { actualizarVendedor, crearVendedor } from './actions';
+import { actualizarVendedor, crearVendedor, eliminarVendedor } from './actions';
 import type { Vendedor } from '@/lib/types';
 
 type UsuarioOpcion = { id: string; nombre_completo: string; correo: string };
@@ -110,9 +110,20 @@ function FilaVendedor({
   const [usuarioId, setUsuarioId] = useState(v.usuario_id ?? '');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   const usuarioActual = usuarios.find((u) => u.id === v.usuario_id);
   const opcionesUsuario = usuarios.filter((u) => u.id === v.usuario_id || !usuariosVinculados.has(u.id));
+
+  async function handleEliminar() {
+    setGuardando(true);
+    setErrorEliminar(null);
+    const r = await eliminarVendedor(v.id);
+    setGuardando(false);
+    setConfirmandoEliminar(false);
+    if (r?.error) setErrorEliminar(r.error); else onCerrarEdicion();
+  }
 
   return (
     <>
@@ -132,14 +143,30 @@ function FilaVendedor({
           <td className="py-2 pr-2 whitespace-nowrap">
             <button className="mr-2 text-xs font-semibold text-navy-600 hover:underline" onClick={onEditar}>Editar</button>
             <button
-              className="text-xs font-semibold text-slate-500 hover:underline"
+              className="mr-2 text-xs font-semibold text-slate-500 hover:underline"
               onClick={async () => { await actualizarVendedor(v.id, { activo: !v.activo }); onCerrarEdicion(); }}
             >
               {v.activo ? 'Desactivar' : 'Activar'}
             </button>
+            {!confirmandoEliminar ? (
+              <button className="text-xs font-semibold text-red-500 hover:underline" disabled={guardando} onClick={() => setConfirmandoEliminar(true)}>
+                Eliminar
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs">
+                ¿Eliminar?
+                <button className="font-semibold text-red-600 hover:underline" disabled={guardando} onClick={handleEliminar}>Sí</button>
+                <button className="text-slate-400 hover:underline" disabled={guardando} onClick={() => setConfirmandoEliminar(false)}>No</button>
+              </span>
+            )}
           </td>
         )}
       </tr>
+      {errorEliminar && (
+        <tr className="bg-red-50">
+          <td colSpan={8} className="px-2 py-2 text-xs text-red-700">{errorEliminar}</td>
+        </tr>
+      )}
       {editando && (
         <tr className="bg-slate-50">
           <td colSpan={8} className="p-3">

@@ -29,3 +29,21 @@ export async function actualizarVendedor(id: string, patch: {
   revalidatePath('/cotizaciones/nueva');
   return { ok: true };
 }
+
+// Elimina definitivamente un vendedor. Solo es posible si no tiene cotizaciones,
+// comisiones o liquidaciones asociadas (relaciones RESTRICT a propósito, para no perder
+// trazabilidad financiera) — si las tiene, se debe usar "Desactivar" en su lugar.
+export async function eliminarVendedor(id: string) {
+  await requireSesion('VENDEDORES_EDITAR');
+  const supabase = createClient();
+  const { error } = await supabase.from('vendedores').delete().eq('id', id);
+  if (error) {
+    if (error.code === '23503') {
+      return { error: 'Este vendedor tiene cotizaciones, comisiones o liquidaciones asociadas — no se puede eliminar. Use "Desactivar" en su lugar para quitarlo de las listas sin perder el historial.' };
+    }
+    return { error: error.message };
+  }
+  revalidatePath('/vendedores');
+  revalidatePath('/cotizaciones/nueva');
+  return { ok: true };
+}
