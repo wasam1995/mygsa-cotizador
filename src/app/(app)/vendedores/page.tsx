@@ -16,7 +16,7 @@ export default async function VendedoresPage() {
 
   return (
     <div>
-      <h1 className="mb-5 text-xl font-bold text-slate-800">Vendedores</h1>
+      <h1 className="mb-5 page-title">Vendedores</h1>
       <VendedoresClient
         vendedores={(vendedores ?? []) as Vendedor[]}
         usuarios={(usuarios ?? []) as { id: string; nombre_completo: string; correo: string }[]}

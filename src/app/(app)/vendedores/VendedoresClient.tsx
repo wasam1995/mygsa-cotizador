@@ -67,7 +67,7 @@ export default function VendedoresClient({
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+            <tr className="table-head-row">
               <th className="py-2 pr-2">Código</th><th className="py-2 pr-2">Nombre completo</th>
               <th className="py-2 pr-2">Teléfono</th><th className="py-2 pr-2">Correo</th>
               <th className="py-2 pr-2">% Comisión fija*</th><th className="py-2 pr-2">Usuario vinculado</th>
@@ -224,7 +224,7 @@ function NuevoVendedorForm({
 
   return (
     <div className="card border-navy-200 bg-navy-50/40">
-      <h3 className="mb-3 text-sm font-bold text-slate-700">Nuevo vendedor</h3>
+      <h3 className="mb-3 section-title">Nuevo vendedor</h3>
       <p className="mb-3 text-xs text-slate-500">
         Un vendedor puede existir solo como catálogo (para asignarlo a cotizaciones) sin necesidad de crearle un usuario
         con acceso al sistema. Si ya tiene un usuario, puedes vincularlo abajo.
