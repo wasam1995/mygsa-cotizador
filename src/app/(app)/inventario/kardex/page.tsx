@@ -23,7 +23,7 @@ export default async function KardexPage({ searchParams }: { searchParams: { pro
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-800">Kardex de inventario</h1>
+        <h1 className="page-title">Kardex de inventario</h1>
         <a href={`/api/kardex/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
           ⬇️ Exportar Excel
         </a>

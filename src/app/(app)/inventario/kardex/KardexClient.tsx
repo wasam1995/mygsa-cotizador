@@ -25,7 +25,7 @@ export default function KardexClient({ movimientos, puedeEliminar }: { movimient
     <div className="card overflow-x-auto">
       <table className="w-full min-w-[920px] text-sm">
         <thead>
-          <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+          <tr className="table-head-row">
             <th className="py-2 pr-2">Fecha</th><th className="py-2 pr-2">Tipo</th>
             <th className="py-2 pr-2">Producto</th><th className="py-2 pr-2">Cant.</th>
             <th className="py-2 pr-2">Cotización</th><th className="py-2 pr-2">Cliente</th>
