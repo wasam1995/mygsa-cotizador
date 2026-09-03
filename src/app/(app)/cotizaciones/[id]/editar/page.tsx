@@ -40,7 +40,14 @@ export default async function EditarCotizacionPage({ params }: { params: { id: s
 
   return (
     <div>
-      <h1 className="mb-5 text-xl font-bold text-slate-800">Modificar cotización {cotizacion.numero_interno}</h1>
+      <h1 className="mb-5 page-title">Modificar cotización {cotizacion.numero_interno}</h1>
+      {cotizacion.estado === 'FACTURADO' && (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Esta cotización ya está facturada — el inventario real ya se rebajó. Al guardar los cambios, el sistema
+          ajustará automáticamente la existencia solo por la <b>diferencia</b> entre las cantidades que tenía y las
+          nuevas (por producto) y lo dejará registrado en el kardex como un movimiento de tipo &quot;Ajuste&quot;.
+        </div>
+      )}
       <CotizadorForm
         vendedores={(vendedores ?? []) as Vendedor[]}
         clientes={(clientes ?? []) as Cliente[]}
