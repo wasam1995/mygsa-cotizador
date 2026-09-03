@@ -57,7 +57,7 @@ export default function ComisionesResultados({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-800">Comisiones {verTodas ? 'por vendedor' : ''}</h1>
+        <h1 className="page-title">Comisiones {verTodas ? 'por vendedor' : ''}</h1>
         <a href={`/api/comisiones/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
           ⬇️ Exportar Excel
         </a>
@@ -86,10 +86,10 @@ export default function ComisionesResultados({
 
       {verTodas && (
         <div className="card overflow-x-auto">
-          <h2 className="mb-3 text-sm font-bold text-slate-700">Resumen por vendedor</h2>
+          <h2 className="mb-3 section-title">Resumen por vendedor</h2>
           <table className="w-full min-w-[600px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+              <tr className="table-head-row">
                 <th className="py-2 pr-2">Vendedor</th><th className="py-2 pr-2">Cód.</th>
                 <th className="py-2 pr-2"># Ventas</th><th className="py-2 pr-2">Base</th><th className="py-2 pr-2">Comisión</th>
               </tr>
@@ -111,7 +111,7 @@ export default function ComisionesResultados({
 
       <div className="card">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-slate-700">Liquidaciones de comisiones</h2>
+          <h2 className="section-title">Liquidaciones de comisiones</h2>
           {puedeLiquidar && (
             <button className="btn btn-orange" onClick={() => setMostrarNuevaLiquidacion(true)}>+ Nueva liquidación</button>
           )}
@@ -136,10 +136,10 @@ export default function ComisionesResultados({
       </div>
 
       <div className="card overflow-x-auto">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Detalle</h2>
+        <h2 className="mb-3 section-title">Detalle</h2>
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+            <tr className="table-head-row">
               <th className="py-2 pr-2">Fecha</th><th className="py-2 pr-2">Cotización</th>
               {verTodas && <th className="py-2 pr-2">Vendedor</th>}
               <th className="py-2 pr-2">Base</th><th className="py-2 pr-2">%</th><th className="py-2 pr-2">Comisión</th>
@@ -282,7 +282,7 @@ function NuevaLiquidacionForm({
   return (
     <div className="card mb-4 border-navy-200 bg-navy-50/40">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-slate-700">Nueva liquidación</h3>
+        <h3 className="section-title">Nueva liquidación</h3>
         {vendedores.length > 0 && (
           <div className="flex gap-1 rounded-lg border border-navy-200 bg-white p-0.5 text-xs">
             <button
@@ -474,7 +474,7 @@ function TablaLiquidaciones({
   return (
     <table className="w-full min-w-[900px] text-sm">
       <thead>
-        <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+        <tr className="table-head-row">
           <th className="py-2 pr-2">Número</th><th className="py-2 pr-2">Vendedor</th>
           <th className="py-2 pr-2">Rango</th><th className="py-2 pr-2">Comisiones</th>
           <th className="py-2 pr-2">Descuentos</th><th className="py-2 pr-2">Neto</th>
