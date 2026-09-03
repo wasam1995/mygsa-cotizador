@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import ProductPicker from './ProductPicker';
 import PrintQuote from './PrintQuote';
 import PrintQuoteInterno from './PrintQuoteInterno';
+import PdfPreview from './PdfPreview';
 import { calcularCotizacion, distribuirCostosOperativosPorLinea, numeroALetras, precioPorMargen } from '@/lib/fiscal';
 import { formatQ, esTelefonoGuatemalaValido, normalizarTelefonoGuatemala } from '@/lib/utils';
 import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ModoPrecioLinea, ParametrosFiscales, PlantillaCotizacion, Producto, Vendedor } from '@/lib/types';
@@ -905,35 +906,39 @@ function PreviewGuardado({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-8">
+        <div className="flex-1 overflow-hidden bg-slate-50">
           {tab === 'cliente' ? (
-            <PrintQuote
-              cotizacion={cotizacion}
-              lineas={lineas}
-              parametros={parametros}
-              plantilla={plantilla}
-              clienteNombre={clienteNombre}
-              clienteNit={clienteNit}
-              clienteDireccion={clienteDireccion}
-              clienteContacto={clienteContacto}
-              vendedorNombre={vendedorNombre}
-              vendedorCorreo={vendedorCorreo}
-            />
+            <PdfPreview>
+              <PrintQuote
+                cotizacion={cotizacion}
+                lineas={lineas}
+                parametros={parametros}
+                plantilla={plantilla}
+                clienteNombre={clienteNombre}
+                clienteNit={clienteNit}
+                clienteDireccion={clienteDireccion}
+                clienteContacto={clienteContacto}
+                vendedorNombre={vendedorNombre}
+                vendedorCorreo={vendedorCorreo}
+              />
+            </PdfPreview>
           ) : (
-            <PrintQuoteInterno
-              cotizacion={cotizacion}
-              lineas={lineas}
-              costosOperativos={costosOperativos}
-              prorrateoPorLinea={prorrateoPorLinea}
-              parametros={parametros}
-              plantilla={plantilla}
-              clienteNombre={clienteNombre}
-              clienteNit={clienteNit}
-              clienteDireccion={clienteDireccion}
-              clienteContacto={clienteContacto}
-              vendedorNombre={vendedorNombre}
-              vendedorCorreo={vendedorCorreo}
-            />
+            <PdfPreview>
+              <PrintQuoteInterno
+                cotizacion={cotizacion}
+                lineas={lineas}
+                costosOperativos={costosOperativos}
+                prorrateoPorLinea={prorrateoPorLinea}
+                parametros={parametros}
+                plantilla={plantilla}
+                clienteNombre={clienteNombre}
+                clienteNit={clienteNit}
+                clienteDireccion={clienteDireccion}
+                clienteContacto={clienteContacto}
+                vendedorNombre={vendedorNombre}
+                vendedorCorreo={vendedorCorreo}
+              />
+            </PdfPreview>
           )}
         </div>
 

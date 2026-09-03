@@ -1,4 +1,6 @@
+import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { formatQ, formatFecha } from '@/lib/utils';
+import { paletaPdf, PDF_FONT } from '@/lib/pdf/theme';
 import type { Cotizacion, CotizacionDetalle, ParametrosFiscales, PlantillaCotizacion } from '@/lib/types';
 
 type LineaConFoto = CotizacionDetalle & { producto?: { imagen_url: string | null; unidad?: string | null } | null };
@@ -12,6 +14,13 @@ const CONDICIONES_DEFECTO = [
   'Precios sujetos a cambio sin previo aviso una vez vencida la vigencia indicada.',
 ];
 
+// Documento imprimible "versión cliente" — reescrito en Etapa 7 con @react-pdf/renderer
+// (antes era un <div> HTML capturado como imagen con html2canvas + jsPDF). Ahora genera
+// un PDF vectorial real: texto seleccionable, tamaño de archivo menor, y paginación
+// automática de verdad en vez de "rebanar" una imagen. Este mismo componente sirve tanto
+// para la vista previa en pantalla (envuelto en <PdfPreview>, ver ese componente) como
+// para el archivo que se descarga (con pdf(<PrintQuote .../>).toBlob()) — un solo lugar
+// define cómo se ve el documento, así que preview y descarga nunca pueden desalinearse.
 export default function PrintQuote({
   cotizacion, lineas, parametros, plantilla, clienteNombre, clienteNit, clienteDireccion, clienteContacto,
   vendedorNombre, vendedorCorreo,
@@ -30,14 +39,8 @@ export default function PrintQuote({
   const anulada = cotizacion.estado === 'ANULADO';
   const mostrarPrecios = cotizacion.mostrar_precios_unitarios_cliente;
   const mostrarVendedor = cotizacion.mostrar_vendedor_cliente;
-
-  const primario = parametros.color_primario || '#0f172a';
-  const acento = parametros.color_acento || '#f97316';
-  const acentoOscuro = parametros.color_acento_oscuro || '#ea580c';
-  const fondo = parametros.color_fondo || '#f8fafc';
-  const fondoAlterno = parametros.color_fondo_alterno || '#fff7ed';
-  const borde = parametros.color_borde || '#e2e8f0';
-  const tipografia = parametros.tipografia || 'Helvetica Neue, Arial, ui-sans-serif, sans-serif';
+  const pal = paletaPdf(parametros);
+  const s = crearEstilos(pal);
 
   const condiciones = (plantilla?.condiciones_comerciales?.trim()
     ? plantilla.condiciones_comerciales.split('\n').map((l) => l.trim()).filter(Boolean)
@@ -49,159 +52,207 @@ export default function PrintQuote({
   const apartados = plantilla?.apartados ?? [];
 
   return (
-    <div
-      className="print-area relative mx-auto max-w-3xl overflow-hidden rounded-2xl border shadow-card print:rounded-none print:border-0 print:shadow-none"
-      style={{ fontFamily: tipografia, borderColor: borde, backgroundColor: '#ffffff', fontSize: '9pt', lineHeight: 1.5 }}
-    >
-      {anulada && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <span className="rotate-[-25deg] border-4 border-red-500 px-8 py-2 text-4xl font-black tracking-widest text-red-500/70">
-            ANULADA
-          </span>
-        </div>
-      )}
+    <Document title={`Cotización ${cotizacion.numero_sistema_externo || cotizacion.numero_interno}`}>
+      <Page size="A4" style={s.page}>
+        {anulada && (
+          <View style={s.marcaAguaCapa} fixed>
+            <Text style={s.marcaAgua}>ANULADA</Text>
+          </View>
+        )}
 
-      {/* Banner superior decorativo con degradado corporativo */}
-      <div className="h-3 w-full" style={{ background: `linear-gradient(90deg, ${primario}, ${acento})` }} />
+        {/* Banner superior corporativo — dos tonos (primario / acento) en vez de un
+            degradado real: @react-pdf/renderer no terminó pintando el <LinearGradient>
+            de forma confiable en las pruebas, así que se prefirió esta versión simple,
+            que siempre se ve bien. */}
+        <View style={s.banner}>
+          <View style={[s.bannerMitad, { backgroundColor: pal.primario }]} />
+          <View style={[s.bannerMitad, { backgroundColor: pal.acento }]} />
+        </View>
 
-      <div className="p-8">
         {/* Cabecera dual: emisor a la izquierda, folio/fecha/validez/moneda a la derecha */}
-        <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: borde }}>
-          <div className="flex items-start gap-3">
+        <View style={s.cabecera}>
+          <View style={s.cabeceraEmisor}>
             {parametros.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={parametros.logo_url} alt={parametros.nombre_comercial || parametros.razon_social} className="h-14 max-w-[10rem] object-contain" />
+              <Image src={parametros.logo_url} style={s.logo} />
             ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl text-lg font-bold text-white" style={{ backgroundColor: primario }}>MG</div>
+              <View style={[s.logoPlaceholder, { backgroundColor: pal.primario }]}>
+                <Text style={s.logoPlaceholderTexto}>MG</Text>
+              </View>
             )}
-            <div>
-              <p className="font-bold" style={{ color: primario, fontSize: '11pt' }}>{parametros.nombre_comercial || parametros.razon_social}</p>
-              <p className="text-slate-500">{parametros.direccion_empresa}</p>
-              <p className="text-slate-500">{parametros.telefono_empresa} · {parametros.correo_empresa}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <h1 className="font-bold tracking-tight" style={{ color: acentoOscuro, fontSize: '22pt' }}>COTIZACIÓN</h1>
-            <p className="text-slate-500">Folio: <b style={{ color: acento }}>{cotizacion.numero_sistema_externo || cotizacion.numero_interno}</b></p>
-            <p className="text-slate-500">Fecha: {formatFecha(cotizacion.fecha_emision)}</p>
-            <p className="text-slate-500">Válida hasta: {formatFecha(cotizacion.fecha_vencimiento)}</p>
-            <p className="text-slate-500">Moneda: Quetzales (GTQ)</p>
+            <View style={{ marginLeft: 8 }}>
+              <Text style={[s.emisorNombre, { color: pal.primario }]}>{parametros.nombre_comercial || parametros.razon_social}</Text>
+              <Text style={s.textoGris}>{parametros.direccion_empresa}</Text>
+              <Text style={s.textoGris}>{parametros.telefono_empresa} · {parametros.correo_empresa}</Text>
+            </View>
+          </View>
+          <View style={s.cabeceraFolio}>
+            <Text style={[s.tituloDoc, { color: pal.acentoOscuro }]}>COTIZACIÓN</Text>
+            <Text style={s.textoGris}>Folio: <Text style={{ color: pal.acento, fontWeight: 700 }}>{cotizacion.numero_sistema_externo || cotizacion.numero_interno}</Text></Text>
+            <Text style={s.textoGris}>Fecha: {formatFecha(cotizacion.fecha_emision)}</Text>
+            <Text style={s.textoGris}>Válida hasta: {formatFecha(cotizacion.fecha_vencimiento)}</Text>
+            <Text style={s.textoGris}>Moneda: Quetzales (GTQ)</Text>
             {mostrarVendedor && (
-              <p className="text-slate-500">Vendedor: {vendedorNombre}{cotizacion.vendedor_telefono ? ` · ${cotizacion.vendedor_telefono}` : ''}{vendedorCorreo ? ` · ${vendedorCorreo}` : ''}</p>
+              <Text style={s.textoGris}>Vendedor: {vendedorNombre}{cotizacion.vendedor_telefono ? ` · ${cotizacion.vendedor_telefono}` : ''}{vendedorCorreo ? ` · ${vendedorCorreo}` : ''}</Text>
             )}
-          </div>
-        </div>
+          </View>
+        </View>
 
         {/* Tarjetas de información en doble columna */}
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <div className="rounded-xl p-3" style={{ backgroundColor: fondo }}>
-            <p className="mb-1 font-bold uppercase tracking-wide" style={{ color: primario, fontSize: '8pt' }}>Información del cliente</p>
-            <p><span className="font-semibold">Nombre:</span> {clienteNombre}</p>
-            <p><span className="font-semibold">Dirección:</span> {clienteDireccion || '—'}</p>
-            <p><span className="font-semibold">Teléfono:</span> {cotizacion.cliente_telefono || '—'}</p>
-            {clienteNit && <p><span className="font-semibold">NIT:</span> {clienteNit}</p>}
-            {clienteContacto && <p><span className="font-semibold">Atención:</span> {clienteContacto}</p>}
-          </div>
-          <div className="rounded-xl p-3" style={{ backgroundColor: fondo }}>
-            <p className="mb-1 font-bold uppercase tracking-wide" style={{ color: primario, fontSize: '8pt' }}>Detalles del proyecto / visita técnica</p>
-            <p className="whitespace-pre-line text-slate-600">{cotizacion.comentario || 'Sin observaciones adicionales.'}</p>
-          </div>
-        </div>
+        <View style={s.filaDosColumnas}>
+          <View style={[s.tarjeta, { backgroundColor: pal.fondo }]}>
+            <Text style={[s.tarjetaTitulo, { color: pal.primario }]}>Información del cliente</Text>
+            <Text style={s.linea}><Text style={s.negrita}>Nombre:</Text> {clienteNombre}</Text>
+            <Text style={s.linea}><Text style={s.negrita}>Dirección:</Text> {clienteDireccion || '—'}</Text>
+            <Text style={s.linea}><Text style={s.negrita}>Teléfono:</Text> {cotizacion.cliente_telefono || '—'}</Text>
+            {clienteNit && <Text style={s.linea}><Text style={s.negrita}>NIT:</Text> {clienteNit}</Text>}
+            {clienteContacto && <Text style={s.linea}><Text style={s.negrita}>Atención:</Text> {clienteContacto}</Text>}
+          </View>
+          <View style={[s.tarjeta, { backgroundColor: pal.fondo, marginLeft: 10 }]}>
+            <Text style={[s.tarjetaTitulo, { color: pal.primario }]}>Detalles del proyecto / visita técnica</Text>
+            <Text style={s.textoGrisOscuro}>{cotizacion.comentario || 'Sin observaciones adicionales.'}</Text>
+          </View>
+        </View>
 
         {/* Cuadro de presentación institucional */}
         {plantilla?.texto_institucional && (
-          <div className="mt-4 rounded-r-lg border-l-4 p-3" style={{ borderColor: acento, backgroundColor: fondo }}>
-            <p className="text-slate-600">{plantilla.texto_institucional}</p>
-          </div>
+          <View style={[s.cuadroAcento, { borderColor: pal.acento, backgroundColor: pal.fondo }]}>
+            <Text style={s.textoGrisOscuro}>{plantilla.texto_institucional}</Text>
+          </View>
         )}
 
         {/* Tabla de ítems */}
-        <p className="mb-2 mt-5 font-bold uppercase tracking-wide" style={{ color: primario, fontSize: '9pt' }}>{tituloTabla}</p>
-        <table className="w-full">
-          <thead>
-            <tr className="border-b-2 text-left uppercase text-slate-500" style={{ borderColor: acento, fontSize: '7.5pt' }}>
-              <th className="w-12 py-2">Foto</th>
-              <th className="py-2">Descripción</th>
-              <th className="py-2 text-right">Cant.</th>
-              <th className="py-2 text-right">Unidad</th>
-              {mostrarPrecios && <th className="py-2 text-right">Precio</th>}
-              {mostrarPrecios && <th className="py-2 text-right">Total</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {lineas.map((l) => {
-              const foto = l.incluir_foto ? l.producto?.imagen_url : null;
-              return (
-                <tr key={l.id} className="border-b" style={{ borderColor: borde }}>
-                  <td className="py-2">
-                    {foto ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={foto} alt={l.descripcion} className="h-[50px] w-[50px] rounded object-cover" />
-                    ) : (
-                      <div className="h-[50px] w-[50px] rounded" style={{ backgroundColor: fondo }} />
-                    )}
-                  </td>
-                  <td className="py-2 pr-2">{l.descripcion}</td>
-                  <td className="py-2 text-right">{l.cantidad}</td>
-                  <td className="py-2 text-right text-slate-500">{l.producto?.unidad || 'unidad'}</td>
-                  {mostrarPrecios && <td className="py-2 text-right">{formatQ(l.precio_unitario)}</td>}
-                  {mostrarPrecios && <td className="py-2 text-right font-medium">{formatQ(l.subtotal_linea)}</td>}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <Text style={[s.seccionTitulo, { color: pal.primario }]}>{tituloTabla}</Text>
+        <View style={[s.tablaHead, { borderColor: pal.acento }]}>
+          <Text style={s.colFoto}>Foto</Text>
+          <Text style={s.colDescripcion}>Descripción</Text>
+          <Text style={s.colCant}>Cant.</Text>
+          <Text style={s.colUnidad}>Unidad</Text>
+          {mostrarPrecios && <Text style={s.colPrecio}>Precio</Text>}
+          {mostrarPrecios && <Text style={s.colPrecio}>Total</Text>}
+        </View>
+        {lineas.map((l) => {
+          const foto = l.incluir_foto ? l.producto?.imagen_url : null;
+          return (
+            <View key={l.id} style={[s.tablaFila, { borderColor: pal.borde }]} wrap={false}>
+              <View style={s.colFoto}>
+                {foto ? (
+                  <Image src={foto} style={s.fotoProducto} />
+                ) : (
+                  <View style={[s.fotoVacia, { backgroundColor: pal.fondo }]} />
+                )}
+              </View>
+              <Text style={s.colDescripcion}>{l.descripcion}</Text>
+              <Text style={s.colCant}>{l.cantidad}</Text>
+              <Text style={[s.colUnidad, s.textoGris]}>{l.producto?.unidad || 'unidad'}</Text>
+              {mostrarPrecios && <Text style={s.colPrecio}>{formatQ(l.precio_unitario)}</Text>}
+              {mostrarPrecios && <Text style={[s.colPrecio, s.negrita]}>{formatQ(l.subtotal_linea)}</Text>}
+            </View>
+          );
+        })}
         {!mostrarPrecios && (
-          <p className="mt-2 text-right italic text-slate-400" style={{ fontSize: '8pt' }}>
-            Precios detallados por artículo omitidos — se muestra el precio total del paquete.
-          </p>
+          <Text style={s.notaSinPrecios}>Precios detallados por artículo omitidos — se muestra el precio total del paquete.</Text>
         )}
 
         {/* Totales alineados a la derecha */}
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:justify-between">
-          <div className="max-w-xs rounded-lg border-l-4 border-emerald-400 bg-emerald-50 p-3">
-            <p className="font-bold text-emerald-800" style={{ fontSize: '8pt' }}>EN LETRAS</p>
-            <p className="mt-1 italic text-emerald-700">{cotizacion.total_en_letras}</p>
-          </div>
-          <div className="w-full max-w-xs rounded-lg p-3" style={{ backgroundColor: fondo, border: `1px solid ${borde}` }}>
-            <div className="flex justify-between py-1"><span className="text-slate-500">Subtotal (incluye IVA)</span><span>{formatQ(cotizacion.subtotal)}</span></div>
+        <View style={s.filaTotales} wrap={false}>
+          <View style={s.cajaLetras}>
+            <Text style={s.cajaLetrasTitulo}>EN LETRAS</Text>
+            <Text style={s.cajaLetrasTexto}>{cotizacion.total_en_letras}</Text>
+          </View>
+          <View style={[s.cajaTotales, { backgroundColor: pal.fondo, borderColor: pal.borde }]}>
+            <View style={s.filaSubtotal}><Text style={s.textoGris}>Subtotal (incluye IVA)</Text><Text>{formatQ(cotizacion.subtotal)}</Text></View>
             {cotizacion.total_descuentos > 0 && (
-              <div className="flex justify-between py-1" style={{ color: acentoOscuro }}><span>Descuento especial</span><span>-{formatQ(cotizacion.total_descuentos)}</span></div>
+              <View style={s.filaSubtotal}><Text style={{ color: pal.acentoOscuro }}>Descuento especial</Text><Text style={{ color: pal.acentoOscuro }}>-{formatQ(cotizacion.total_descuentos)}</Text></View>
             )}
-            <div className="flex justify-between rounded-lg px-2 py-2 font-bold" style={{ backgroundColor: fondoAlterno, color: acentoOscuro, fontSize: '11pt' }}>
-              <span>TOTAL</span><span>{formatQ(cotizacion.total_cotizado)}</span>
-            </div>
-          </div>
-        </div>
+            <View style={[s.filaTotal, { backgroundColor: pal.fondoAlterno }]}>
+              <Text style={[s.negrita, { color: pal.acentoOscuro, fontSize: 11 }]}>TOTAL</Text>
+              <Text style={[s.negrita, { color: pal.acentoOscuro, fontSize: 11 }]}>{formatQ(cotizacion.total_cotizado)}</Text>
+            </View>
+          </View>
+        </View>
 
         {/* Apartados adicionales de la plantilla */}
         {apartados.map((ap, idx) => (
           ap.titulo || ap.contenido ? (
-            <div key={idx} className="mt-4 border-t pt-3" style={{ borderColor: borde }}>
-              {ap.titulo && <p className="mb-1 font-bold text-slate-700" style={{ fontSize: '8.5pt' }}>{ap.titulo.toUpperCase()}</p>}
-              <p className="whitespace-pre-line text-slate-600">{ap.contenido}</p>
-            </div>
+            <View key={idx} style={[s.apartado, { borderColor: pal.borde }]} wrap={false}>
+              {ap.titulo && <Text style={s.apartadoTitulo}>{ap.titulo.toUpperCase()}</Text>}
+              <Text style={s.textoGrisOscuro}>{ap.contenido}</Text>
+            </View>
           ) : null
         ))}
 
         {/* Términos y condiciones */}
-        <div className="mt-5 rounded-r-lg border-l-4 p-3" style={{ borderColor: acento, backgroundColor: fondo }}>
-          <p className="mb-1 font-bold text-slate-700" style={{ fontSize: '8.5pt' }}>TÉRMINOS Y CONDICIONES COMERCIALES</p>
-          <ol className="list-inside list-decimal space-y-0.5 text-slate-600">
-            {condiciones.map((linea, idx) => <li key={idx}>{linea}</li>)}
-          </ol>
-        </div>
+        <View style={[s.cuadroAcento, { borderColor: pal.acento, backgroundColor: pal.fondo, marginTop: 12 }]} wrap={false}>
+          <Text style={s.apartadoTitulo}>TÉRMINOS Y CONDICIONES COMERCIALES</Text>
+          {condiciones.map((linea, idx) => (
+            <Text key={idx} style={s.textoGrisOscuro}>{idx + 1}. {linea}</Text>
+          ))}
+        </View>
 
         {/* Bloque de firmas */}
-        <div className="mt-10 grid grid-cols-2 gap-8 text-center text-slate-500">
-          <div className="border-t border-slate-400 pt-2">{firmaEmisor}</div>
-          <div className="border-t border-slate-400 pt-2">{firmaCliente}</div>
-        </div>
+        <View style={s.filaFirmas} wrap={false}>
+          <View style={s.firma}><Text style={s.firmaTexto}>{firmaEmisor}</Text></View>
+          <View style={s.firma}><Text style={s.firmaTexto}>{firmaCliente}</Text></View>
+        </View>
 
-        <div className="mt-6 border-t border-dashed pt-4 text-center leading-relaxed text-slate-500" style={{ borderColor: borde, fontSize: '7.5pt' }}>
-          {leyendaPie}
-        </div>
-      </div>
-    </div>
+        <Text style={[s.leyendaPie, { borderColor: pal.borde }]}>{leyendaPie}</Text>
+
+        {/* Nota: el estilo de <Page> deliberadamente no lleva "lineHeight" — puesto ahí
+            hace que este pie de página fijo deje de pintarse (comportamiento verificado de
+            @react-pdf/renderer 4.9). El interlineado por defecto ya se ve bien. */}
+        <Text style={s.footer} fixed render={({ pageNumber, totalPages }) => `${parametros.nombre_comercial || parametros.razon_social}     ·     Página ${pageNumber} de ${totalPages}`} />
+      </Page>
+    </Document>
   );
+}
+
+function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
+  return StyleSheet.create({
+    page: { fontFamily: PDF_FONT, fontSize: 9, paddingTop: 0, paddingBottom: 50, paddingHorizontal: 32, color: '#1e293b' },
+    banner: { flexDirection: 'row', width: '100%', height: 8, marginBottom: 22 },
+    bannerMitad: { flex: 1, height: 8 },
+    marcaAguaCapa: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+    marcaAgua: { fontSize: 56, fontWeight: 700, color: '#ef4444', opacity: 0.35, transform: 'rotate(-25deg)' },
+    cabecera: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 12 },
+    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 280 },
+    logo: { width: 52, height: 52, objectFit: 'contain' },
+    logoPlaceholder: { width: 52, height: 52, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    logoPlaceholderTexto: { color: '#fff', fontSize: 13, fontWeight: 700 },
+    emisorNombre: { fontSize: 11, fontWeight: 700, marginBottom: 2 },
+    cabeceraFolio: { alignItems: 'flex-end' },
+    tituloDoc: { fontSize: 20, fontWeight: 700, marginBottom: 3 },
+    textoGris: { color: '#64748b', fontSize: 8.5 },
+    textoGrisOscuro: { color: '#475569', fontSize: 8.5 },
+    negrita: { fontWeight: 700 },
+    filaDosColumnas: { flexDirection: 'row', marginTop: 12 },
+    tarjeta: { flex: 1, borderRadius: 8, padding: 8 },
+    tarjetaTitulo: { fontWeight: 700, textTransform: 'uppercase', fontSize: 7.5, marginBottom: 3, letterSpacing: 0.5 },
+    linea: { fontSize: 8.5, marginBottom: 1 },
+    cuadroAcento: { marginTop: 12, borderLeftWidth: 3, borderRadius: 4, padding: 8 },
+    seccionTitulo: { marginTop: 16, marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', fontSize: 9, letterSpacing: 0.5 },
+    tablaHead: { flexDirection: 'row', borderBottomWidth: 1.5, paddingBottom: 5, textTransform: 'uppercase', fontSize: 7 },
+    tablaFila: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 5, alignItems: 'center' },
+    colFoto: { width: 40 },
+    colDescripcion: { flex: 1, paddingRight: 6 },
+    colCant: { width: 42, textAlign: 'right' },
+    colUnidad: { width: 52, textAlign: 'right' },
+    colPrecio: { width: 62, textAlign: 'right' },
+    fotoProducto: { width: 34, height: 34, borderRadius: 3, objectFit: 'cover' },
+    fotoVacia: { width: 34, height: 34, borderRadius: 3 },
+    notaSinPrecios: { marginTop: 4, textAlign: 'right', fontStyle: 'italic', color: '#94a3b8', fontSize: 8 },
+    filaTotales: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
+    cajaLetras: { maxWidth: 220, borderLeftWidth: 3, borderLeftColor: '#34d399', backgroundColor: '#ecfdf5', borderRadius: 6, padding: 8 },
+    cajaLetrasTitulo: { fontWeight: 700, color: '#065f46', fontSize: 8 },
+    cajaLetrasTexto: { marginTop: 3, fontStyle: 'italic', color: '#047857', fontSize: 8.5 },
+    cajaTotales: { width: 220, borderRadius: 6, borderWidth: 1, padding: 8 },
+    filaSubtotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2, fontSize: 8.5 },
+    filaTotal: { flexDirection: 'row', justifyContent: 'space-between', borderRadius: 6, paddingVertical: 5, paddingHorizontal: 6, marginTop: 2 },
+    apartado: { marginTop: 12, borderTopWidth: 1, paddingTop: 8 },
+    apartadoTitulo: { fontWeight: 700, color: '#334155', fontSize: 8.5, marginBottom: 3 },
+    filaFirmas: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 40, gap: 24 },
+    firma: { flex: 1, borderTopWidth: 1, borderTopColor: '#94a3b8', paddingTop: 6, textAlign: 'center' },
+    firmaTexto: { color: '#64748b', fontSize: 8.5 },
+    leyendaPie: { marginTop: 20, borderTopWidth: 1, borderStyle: 'dashed', paddingTop: 10, textAlign: 'center', color: '#64748b', fontSize: 7.5, lineHeight: 1.5 },
+    footer: { position: 'absolute', bottom: 20, left: 32, right: 32, textAlign: 'center', fontSize: 7.5, color: '#94a3b8' },
+  });
 }

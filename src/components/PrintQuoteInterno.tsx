@@ -1,4 +1,6 @@
+import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { formatQ, formatFecha } from '@/lib/utils';
+import { paletaPdf, PDF_FONT } from '@/lib/pdf/theme';
 import type { Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, ParametrosFiscales, PlantillaCotizacion } from '@/lib/types';
 
 type LineaConFoto = CotizacionDetalle & { producto?: { imagen_url: string | null; unidad?: string | null } | null };
@@ -6,7 +8,8 @@ type LineaConFoto = CotizacionDetalle & { producto?: { imagen_url: string | null
 // Versión "Interna" de la cotización imprimible: incluye toda la información financiera
 // (costo, utilidad, comisión) y el desglose real de costos operativos — nunca se envía
 // al cliente. Comparte plantilla/paleta de colores con la versión de cliente para que
-// ambos documentos se vean como parte de la misma familia visual.
+// ambos documentos se vean como parte de la misma familia visual. Reescrito en Etapa 7
+// con @react-pdf/renderer (ver el comentario extenso en PrintQuote.tsx sobre por qué).
 export default function PrintQuoteInterno({
   cotizacion, lineas, costosOperativos, prorrateoPorLinea, parametros, plantilla,
   clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
@@ -24,174 +27,204 @@ export default function PrintQuoteInterno({
   vendedorNombre: string;
   vendedorCorreo: string | null;
 }) {
-  const primario = parametros.color_primario || '#0f172a';
-  const acento = parametros.color_acento || '#f97316';
-  const acentoOscuro = parametros.color_acento_oscuro || '#ea580c';
-  const fondo = parametros.color_fondo || '#f8fafc';
-  const fondoAlterno = parametros.color_fondo_alterno || '#fff7ed';
-  const borde = parametros.color_borde || '#e2e8f0';
-  const tipografia = parametros.tipografia || 'Helvetica Neue, Arial, ui-sans-serif, sans-serif';
+  const pal = paletaPdf(parametros);
+  const s = crearEstilos(pal);
 
   return (
-    <div
-      className="print-area relative mx-auto max-w-3xl overflow-hidden rounded-2xl border shadow-card print:rounded-none print:border-0 print:shadow-none"
-      style={{ fontFamily: tipografia, borderColor: borde, backgroundColor: '#ffffff', fontSize: '9pt', lineHeight: 1.5 }}
-    >
-      <div className="h-3 w-full" style={{ background: `linear-gradient(90deg, ${primario}, ${acento})` }} />
+    <Document title={`Cotización interna ${cotizacion.numero_sistema_externo || cotizacion.numero_interno}`}>
+      <Page size="A4" style={s.page}>
+        <View style={s.banner}>
+          <View style={[s.bannerMitad, { backgroundColor: pal.primario }]} />
+          <View style={[s.bannerMitad, { backgroundColor: pal.acento }]} />
+        </View>
 
-      <div className="p-8">
-        <div className="mb-4 rounded-lg px-3 py-1.5 text-center font-bold uppercase tracking-widest text-white" style={{ backgroundColor: primario, fontSize: '8pt' }}>
-          Documento interno · confidencial · no enviar al cliente
-        </div>
+        <View style={[s.avisoInterno, { backgroundColor: pal.primario }]}>
+          <Text style={s.avisoInternoTexto}>DOCUMENTO INTERNO · CONFIDENCIAL · NO ENVIAR AL CLIENTE</Text>
+        </View>
 
-        <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: borde }}>
-          <div className="flex items-start gap-3">
+        <View style={s.cabecera}>
+          <View style={s.cabeceraEmisor}>
             {parametros.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={parametros.logo_url} alt={parametros.nombre_comercial || parametros.razon_social} className="h-14 max-w-[10rem] object-contain" />
+              <Image src={parametros.logo_url} style={s.logo} />
             ) : (
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl text-lg font-bold text-white" style={{ backgroundColor: primario }}>MG</div>
+              <View style={[s.logoPlaceholder, { backgroundColor: pal.primario }]}>
+                <Text style={s.logoPlaceholderTexto}>MG</Text>
+              </View>
             )}
-            <div>
-              <p className="font-bold" style={{ color: primario, fontSize: '11pt' }}>{parametros.nombre_comercial || parametros.razon_social}</p>
-              <p className="text-slate-500">{parametros.correo_empresa}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <h1 className="font-bold tracking-tight" style={{ color: acentoOscuro, fontSize: '20pt' }}>COTIZACIÓN (INTERNA)</h1>
-            <p className="text-slate-500">Folio: <b style={{ color: acento }}>{cotizacion.numero_sistema_externo || cotizacion.numero_interno}</b></p>
-            <p className="text-slate-500">Fecha: {formatFecha(cotizacion.fecha_emision)}</p>
-            <p className="text-slate-500">Vendedor: {vendedorNombre}{cotizacion.vendedor_telefono ? ` · ${cotizacion.vendedor_telefono}` : ''}{vendedorCorreo ? ` · ${vendedorCorreo}` : ''}</p>
-          </div>
-        </div>
+            <View style={{ marginLeft: 8 }}>
+              <Text style={[s.emisorNombre, { color: pal.primario }]}>{parametros.nombre_comercial || parametros.razon_social}</Text>
+              <Text style={s.textoGris}>{parametros.correo_empresa}</Text>
+            </View>
+          </View>
+          <View style={s.cabeceraFolio}>
+            <Text style={[s.tituloDoc, { color: pal.acentoOscuro }]}>COTIZACIÓN (INTERNA)</Text>
+            <Text style={s.textoGris}>Folio: <Text style={{ color: pal.acento, fontWeight: 700 }}>{cotizacion.numero_sistema_externo || cotizacion.numero_interno}</Text></Text>
+            <Text style={s.textoGris}>Fecha: {formatFecha(cotizacion.fecha_emision)}</Text>
+            <Text style={s.textoGris}>Vendedor: {vendedorNombre}{cotizacion.vendedor_telefono ? ` · ${cotizacion.vendedor_telefono}` : ''}{vendedorCorreo ? ` · ${vendedorCorreo}` : ''}</Text>
+          </View>
+        </View>
 
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <div className="rounded-xl p-3" style={{ backgroundColor: fondo }}>
-            <p className="mb-1 font-bold uppercase tracking-wide" style={{ color: primario, fontSize: '8pt' }}>Cliente</p>
-            <p><span className="font-semibold">Nombre:</span> {clienteNombre}</p>
-            <p><span className="font-semibold">Dirección:</span> {clienteDireccion || '—'}</p>
-            <p><span className="font-semibold">Teléfono:</span> {cotizacion.cliente_telefono || '—'}</p>
-            {clienteNit && <p><span className="font-semibold">NIT:</span> {clienteNit}</p>}
-            {clienteContacto && <p><span className="font-semibold">Atención:</span> {clienteContacto}</p>}
-          </div>
-          <div className="rounded-xl p-3" style={{ backgroundColor: fondo }}>
-            <p className="mb-1 font-bold uppercase tracking-wide" style={{ color: primario, fontSize: '8pt' }}>Detalles del proyecto</p>
-            <p className="whitespace-pre-line text-slate-600">{cotizacion.comentario || 'Sin observaciones adicionales.'}</p>
-          </div>
-        </div>
+        <View style={s.filaDosColumnas}>
+          <View style={[s.tarjeta, { backgroundColor: pal.fondo }]}>
+            <Text style={[s.tarjetaTitulo, { color: pal.primario }]}>Cliente</Text>
+            <Text style={s.linea}><Text style={s.negrita}>Nombre:</Text> {clienteNombre}</Text>
+            <Text style={s.linea}><Text style={s.negrita}>Dirección:</Text> {clienteDireccion || '—'}</Text>
+            <Text style={s.linea}><Text style={s.negrita}>Teléfono:</Text> {cotizacion.cliente_telefono || '—'}</Text>
+            {clienteNit && <Text style={s.linea}><Text style={s.negrita}>NIT:</Text> {clienteNit}</Text>}
+            {clienteContacto && <Text style={s.linea}><Text style={s.negrita}>Atención:</Text> {clienteContacto}</Text>}
+          </View>
+          <View style={[s.tarjeta, { backgroundColor: pal.fondo, marginLeft: 10 }]}>
+            <Text style={[s.tarjetaTitulo, { color: pal.primario }]}>Detalles del proyecto</Text>
+            <Text style={s.textoGrisOscuro}>{cotizacion.comentario || 'Sin observaciones adicionales.'}</Text>
+          </View>
+        </View>
 
-        <table className="mt-5 w-full">
-          <thead>
-            <tr className="border-b-2 text-left uppercase text-slate-500" style={{ borderColor: acento, fontSize: '7.5pt' }}>
-              <th className="py-2">Artículo / servicio</th>
-              <th className="py-2 text-right">Cant.</th>
-              <th className="py-2 text-right">Unidad</th>
-              <th className="py-2 text-right">Costo U.</th>
-              <th className="py-2 text-right">Precio U.</th>
-              <th className="py-2 text-right">Subtotal</th>
-              {cotizacion.prorratear_costos_operativos && <th className="py-2 text-right">Costos oper.</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {lineas.map((l, idx) => (
-              <tr key={l.id} className="border-b" style={{ borderColor: borde }}>
-                <td className="py-2 pr-2">{l.descripcion}</td>
-                <td className="py-2 text-right">{l.cantidad}</td>
-                <td className="py-2 text-right text-slate-500">{l.producto?.unidad || 'unidad'}</td>
-                <td className="py-2 text-right text-slate-500">{formatQ(l.costo_unitario)}</td>
-                <td className="py-2 text-right">{formatQ(l.precio_unitario)}</td>
-                <td className="py-2 text-right font-medium">{formatQ(l.subtotal_linea)}</td>
-                {cotizacion.prorratear_costos_operativos && (
-                  <td className="py-2 text-right text-amber-700">{formatQ(prorrateoPorLinea[idx] ?? 0)}</td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <View style={[s.tablaHead, { borderColor: pal.acento, marginTop: 16 }]}>
+          <Text style={s.colArticulo}>Artículo / servicio</Text>
+          <Text style={s.colCant}>Cant.</Text>
+          <Text style={s.colUnidad}>Unidad</Text>
+          <Text style={s.colMoneda}>Costo U.</Text>
+          <Text style={s.colMoneda}>Precio U.</Text>
+          <Text style={s.colMoneda}>Subtotal</Text>
+          {cotizacion.prorratear_costos_operativos && <Text style={s.colMoneda}>Costos oper.</Text>}
+        </View>
+        {lineas.map((l, idx) => (
+          <View key={l.id} style={[s.tablaFila, { borderColor: pal.borde }]} wrap={false}>
+            <Text style={s.colArticulo}>{l.descripcion}</Text>
+            <Text style={s.colCant}>{l.cantidad}</Text>
+            <Text style={[s.colUnidad, s.textoGris]}>{l.producto?.unidad || 'unidad'}</Text>
+            <Text style={[s.colMoneda, s.textoGris]}>{formatQ(l.costo_unitario)}</Text>
+            <Text style={s.colMoneda}>{formatQ(l.precio_unitario)}</Text>
+            <Text style={[s.colMoneda, s.negrita]}>{formatQ(l.subtotal_linea)}</Text>
+            {cotizacion.prorratear_costos_operativos && (
+              <Text style={[s.colMoneda, { color: '#b45309' }]}>{formatQ(prorrateoPorLinea[idx] ?? 0)}</Text>
+            )}
+          </View>
+        ))}
 
         {costosOperativos.length > 0 && (
-          <div className="mt-4">
-            <p className="mb-1 font-bold text-slate-700" style={{ fontSize: '8.5pt' }}>Costos operativos adicionales</p>
-            <table className="w-full">
-              <thead>
-                <tr className="border-b text-left uppercase text-slate-400" style={{ borderColor: borde, fontSize: '7.5pt' }}>
-                  <th className="py-1.5">Concepto</th>
-                  <th className="py-1.5 text-right">Cant.</th>
-                  <th className="py-1.5 text-right">Días/tiempos</th>
-                  <th className="py-1.5 text-right">Costo unit.</th>
-                  <th className="py-1.5 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {costosOperativos.map((c) => (
-                  <tr key={c.id} className="border-b" style={{ borderColor: borde }}>
-                    <td className="py-1.5">{c.concepto}</td>
-                    <td className="py-1.5 text-right">{c.cantidad}</td>
-                    <td className="py-1.5 text-right">{c.dias}</td>
-                    <td className="py-1.5 text-right">{formatQ(c.costo_unitario)}</td>
-                    <td className="py-1.5 text-right font-medium">{formatQ(c.cantidad * c.dias * c.costo_unitario)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <View style={{ marginTop: 12 }}>
+            <Text style={s.apartadoTitulo}>Costos operativos adicionales</Text>
+            <View style={[s.tablaHeadFina, { borderColor: pal.borde }]}>
+              <Text style={s.colConcepto}>Concepto</Text>
+              <Text style={s.colCant}>Cant.</Text>
+              <Text style={s.colUnidad}>Días/tiempos</Text>
+              <Text style={s.colMoneda}>Costo unit.</Text>
+              <Text style={s.colMoneda}>Total</Text>
+            </View>
+            {costosOperativos.map((c) => (
+              <View key={c.id} style={[s.tablaFilaFina, { borderColor: pal.borde }]} wrap={false}>
+                <Text style={s.colConcepto}>{c.concepto}</Text>
+                <Text style={s.colCant}>{c.cantidad}</Text>
+                <Text style={s.colUnidad}>{c.dias}</Text>
+                <Text style={s.colMoneda}>{formatQ(c.costo_unitario)}</Text>
+                <Text style={[s.colMoneda, s.negrita]}>{formatQ(c.cantidad * c.dias * c.costo_unitario)}</Text>
+              </View>
+            ))}
+          </View>
         )}
 
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-lg p-3" style={{ backgroundColor: fondoAlterno }}>
-            <p className="mb-1.5 font-bold text-slate-700" style={{ fontSize: '8.5pt' }}>Resumen fiscal</p>
-            <Fila label="Subtotal (incluye IVA)" valor={cotizacion.subtotal} />
-            <Fila label="Descuentos" valor={-cotizacion.total_descuentos} />
-            <Fila label="Total cotizado" valor={cotizacion.total_cotizado} negrita />
-            <Fila label="Venta neta base (sin IVA)" valor={cotizacion.base_gravable} />
-            <Fila label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={cotizacion.iva_monto} />
-            <Fila label="Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
-            <Fila label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_retencion} tono="text-red-600" />
-            <Fila label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita tono="text-emerald-700" />
-          </div>
-          <div className="rounded-lg p-3" style={{ backgroundColor: fondoAlterno }}>
-            <p className="mb-1.5 font-bold text-slate-700" style={{ fontSize: '8.5pt' }}>Utilidad y comisión</p>
-            <Fila label="Costo total productos/servicios" valor={cotizacion.costo_total_productos} />
-            <Fila label="+ Gastos operativos" valor={cotizacion.costos_operativos_total} />
-            <Fila label="= Costo total operación" valor={cotizacion.costo_total_operacion} negrita />
-            <Fila label="Utilidad bruta (venta sin IVA - costo)" valor={cotizacion.utilidad_bruta} negrita tono="text-navy-700" />
-            <Fila label="− Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
-            <Fila label="= Utilidad neta (base comisión)" valor={cotizacion.utilidad_neta} negrita tono="text-navy-700" />
-            <div className="flex justify-between py-0.5"><span className="text-slate-500">% Margen (neto)</span><span className="font-semibold">{(cotizacion.margen_utilidad_pct * 100).toFixed(2)}%</span></div>
-            <div className="flex justify-between py-0.5"><span className="text-slate-500">% Comisión vendedor</span><span className="font-semibold">{(cotizacion.comision_estimada_pct * 100).toFixed(2)}%</span></div>
-            <Fila label="Comisión estimada" valor={cotizacion.comision_estimada_monto} tono="text-amber-700" />
-            <Fila label="Ganancia neta empresa" valor={cotizacion.ganancia_neta_estimada} negrita tono="text-emerald-700" />
-          </div>
-        </div>
+        <View style={s.filaResumenes} wrap={false}>
+          <View style={[s.resumen, { backgroundColor: pal.fondoAlterno }]}>
+            <Text style={s.apartadoTitulo}>Resumen fiscal</Text>
+            <FilaResumen label="Subtotal (incluye IVA)" valor={cotizacion.subtotal} />
+            <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
+            <FilaResumen label="Total cotizado" valor={cotizacion.total_cotizado} negrita />
+            <FilaResumen label="Venta neta base (sin IVA)" valor={cotizacion.base_gravable} />
+            <FilaResumen label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={cotizacion.iva_monto} />
+            <FilaResumen label="Retención ISR" valor={-cotizacion.isr_retencion} color="#dc2626" />
+            <FilaResumen label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_retencion} color="#dc2626" />
+            <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita color="#047857" />
+          </View>
+          <View style={[s.resumen, { backgroundColor: pal.fondoAlterno, marginLeft: 10 }]}>
+            <Text style={s.apartadoTitulo}>Utilidad y comisión</Text>
+            <FilaResumen label="Costo total productos/servicios" valor={cotizacion.costo_total_productos} />
+            <FilaResumen label="+ Gastos operativos" valor={cotizacion.costos_operativos_total} />
+            <FilaResumen label="= Costo total operación" valor={cotizacion.costo_total_operacion} negrita />
+            <FilaResumen label="Utilidad bruta (venta sin IVA - costo)" valor={cotizacion.utilidad_bruta} negrita color={pal.primario} />
+            <FilaResumen label="− Retención ISR" valor={-cotizacion.isr_retencion} color="#dc2626" />
+            <FilaResumen label="= Utilidad neta (base comisión)" valor={cotizacion.utilidad_neta} negrita color={pal.primario} />
+            <View style={s.filaSubtotal}><Text style={s.textoGris}>% Margen (neto)</Text><Text style={s.negrita}>{(cotizacion.margen_utilidad_pct * 100).toFixed(2)}%</Text></View>
+            <View style={s.filaSubtotal}><Text style={s.textoGris}>% Comisión vendedor</Text><Text style={s.negrita}>{(cotizacion.comision_estimada_pct * 100).toFixed(2)}%</Text></View>
+            <FilaResumen label="Comisión estimada" valor={cotizacion.comision_estimada_monto} color="#b45309" />
+            <FilaResumen label="Ganancia neta empresa" valor={cotizacion.ganancia_neta_estimada} negrita color="#047857" />
+          </View>
+        </View>
 
         {plantilla?.apartados?.map((ap, idx) => (
           ap.titulo || ap.contenido ? (
-            <div key={idx} className="mt-4 border-t pt-3" style={{ borderColor: borde }}>
-              {ap.titulo && <p className="mb-1 font-bold text-slate-700" style={{ fontSize: '8.5pt' }}>{ap.titulo.toUpperCase()}</p>}
-              <p className="whitespace-pre-line text-slate-600">{ap.contenido}</p>
-            </div>
+            <View key={idx} style={[s.apartado, { borderColor: pal.borde }]} wrap={false}>
+              {ap.titulo && <Text style={s.apartadoTitulo}>{ap.titulo.toUpperCase()}</Text>}
+              <Text style={s.textoGrisOscuro}>{ap.contenido}</Text>
+            </View>
           ) : null
         ))}
 
         {plantilla?.condiciones_comerciales && (
-          <div className="mt-6 rounded-r-lg border-l-4 p-3" style={{ borderColor: acento, backgroundColor: fondo }}>
-            <p className="mb-1 font-bold text-slate-700" style={{ fontSize: '8.5pt' }}>CONDICIONES COMERCIALES ({plantilla.nombre})</p>
-            <ol className="list-inside list-decimal space-y-0.5 text-slate-600">
-              {plantilla.condiciones_comerciales.split('\n').map((l) => l.trim()).filter(Boolean).map((linea, idx) => (
-                <li key={idx}>{linea}</li>
-              ))}
-            </ol>
-          </div>
+          <View style={[s.cuadroAcento, { borderColor: pal.acento, backgroundColor: pal.fondo }]} wrap={false}>
+            <Text style={s.apartadoTitulo}>CONDICIONES COMERCIALES ({plantilla.nombre})</Text>
+            {plantilla.condiciones_comerciales.split('\n').map((l) => l.trim()).filter(Boolean).map((linea, idx) => (
+              <Text key={idx} style={s.textoGrisOscuro}>{idx + 1}. {linea}</Text>
+            ))}
+          </View>
         )}
-      </div>
-    </div>
+
+        {/* Nota: el estilo de <Page> deliberadamente no lleva "lineHeight" — puesto ahí
+            hace que este pie de página fijo deje de pintarse (comportamiento verificado de
+            @react-pdf/renderer 4.9, ver también PrintQuote.tsx). El interlineado por
+            defecto ya se ve bien. */}
+        <Text style={s.footer} fixed render={({ pageNumber, totalPages }) => `${parametros.nombre_comercial || parametros.razon_social} — Interno     ·     Página ${pageNumber} de ${totalPages}`} />
+      </Page>
+    </Document>
   );
 }
 
-function Fila({ label, valor, negrita, tono }: { label: string; valor: number; negrita?: boolean; tono?: string }) {
+function FilaResumen({ label, valor, negrita, color }: { label: string; valor: number; negrita?: boolean; color?: string }) {
   return (
-    <div className={`flex justify-between py-0.5 ${negrita ? 'font-bold text-slate-800' : 'text-slate-600'} ${tono ?? ''}`}>
-      <span>{label}</span><span>{formatQ(valor)}</span>
-    </div>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1.5 }}>
+      <Text style={{ fontSize: 8.5, fontWeight: negrita ? 700 : 400, color: color ?? (negrita ? '#1e293b' : '#475569') }}>{label}</Text>
+      <Text style={{ fontSize: 8.5, fontWeight: negrita ? 700 : 400, color: color ?? (negrita ? '#1e293b' : '#475569') }}>{formatQ(valor)}</Text>
+    </View>
   );
+}
+
+function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
+  return StyleSheet.create({
+    page: { fontFamily: PDF_FONT, fontSize: 9, paddingTop: 0, paddingBottom: 50, paddingHorizontal: 32, color: '#1e293b' },
+    banner: { flexDirection: 'row', width: '100%', height: 8, marginBottom: 14 },
+    bannerMitad: { flex: 1, height: 8 },
+    avisoInterno: { borderRadius: 6, paddingVertical: 5, marginBottom: 12, alignItems: 'center' },
+    avisoInternoTexto: { color: '#fff', fontWeight: 700, fontSize: 8, letterSpacing: 1 },
+    cabecera: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 12 },
+    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 280 },
+    logo: { width: 52, height: 52, objectFit: 'contain' },
+    logoPlaceholder: { width: 52, height: 52, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+    logoPlaceholderTexto: { color: '#fff', fontSize: 13, fontWeight: 700 },
+    emisorNombre: { fontSize: 11, fontWeight: 700, marginBottom: 2 },
+    cabeceraFolio: { alignItems: 'flex-end' },
+    tituloDoc: { fontSize: 18, fontWeight: 700, marginBottom: 3 },
+    textoGris: { color: '#64748b', fontSize: 8.5 },
+    textoGrisOscuro: { color: '#475569', fontSize: 8.5 },
+    negrita: { fontWeight: 700 },
+    filaDosColumnas: { flexDirection: 'row', marginTop: 12 },
+    tarjeta: { flex: 1, borderRadius: 8, padding: 8 },
+    tarjetaTitulo: { fontWeight: 700, textTransform: 'uppercase', fontSize: 7.5, marginBottom: 3, letterSpacing: 0.5 },
+    linea: { fontSize: 8.5, marginBottom: 1 },
+    cuadroAcento: { marginTop: 16, borderLeftWidth: 3, borderRadius: 4, padding: 8 },
+    tablaHead: { flexDirection: 'row', borderBottomWidth: 1.5, paddingBottom: 5, textTransform: 'uppercase', fontSize: 7 },
+    tablaFila: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 5, alignItems: 'center' },
+    tablaHeadFina: { flexDirection: 'row', borderBottomWidth: 1, paddingBottom: 4, textTransform: 'uppercase', fontSize: 6.5, color: '#94a3b8', marginTop: 4 },
+    tablaFilaFina: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 4 },
+    colArticulo: { flex: 1, paddingRight: 6 },
+    colConcepto: { flex: 1, paddingRight: 6, fontSize: 8 },
+    colCant: { width: 40, textAlign: 'right' },
+    colUnidad: { width: 56, textAlign: 'right' },
+    colMoneda: { width: 62, textAlign: 'right' },
+    apartado: { marginTop: 12, borderTopWidth: 1, paddingTop: 8 },
+    apartadoTitulo: { fontWeight: 700, color: '#334155', fontSize: 8.5, marginBottom: 4 },
+    filaResumenes: { flexDirection: 'row', marginTop: 14 },
+    resumen: { flex: 1, borderRadius: 6, padding: 8 },
+    filaSubtotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1.5, fontSize: 8.5 },
+    footer: { position: 'absolute', bottom: 20, left: 32, right: 32, textAlign: 'center', fontSize: 7.5, color: '#94a3b8' },
+  });
 }
