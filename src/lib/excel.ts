@@ -141,6 +141,59 @@ export function formula(f: string) {
   return { f };
 }
 
+export type CeldaLibre = string | number | { f: string; formato?: string } | null | undefined;
+
+/**
+ * Construye una hoja "libre" (no tabular) a partir de una matriz de filas — cada celda es
+ * un valor simple o { f: 'FORMULA' } — con celdas combinadas (merges) opcionales. Se usa
+ * para las hojas "Cotización" (cliente/interna) que necesitan verse como el documento
+ * impreso: bloques de encabezado, tarjetas de info, tabla de ítems y totales, todo en una
+ * sola hoja continua — algo que HojaExcel/construirHoja (pensada para tablas columna×fila
+ * uniformes) no puede armar. Los merges SÍ están soportados por la librería community de
+ * SheetJS (a diferencia de los colores/rellenos — ver nota al inicio del archivo).
+ */
+export function construirHojaLibre(
+  filas: CeldaLibre[][],
+  opciones?: { merges?: string[]; anchoColumnas?: number[]; altoFilas?: number[] }
+): XLSX.WorkSheet {
+  const aoa = filas.map((fila) => fila.map((c) => {
+    if (c === null || c === undefined) return '';
+    if (typeof c === 'object' && 'f' in c) return ''; // se reemplaza abajo por la fórmula real
+    return c;
+  }));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  filas.forEach((fila, r) => {
+    fila.forEach((c, colIdx) => {
+      if (c && typeof c === 'object' && 'f' in c) {
+        const addr = XLSX.utils.encode_cell({ r, c: colIdx });
+        ws[addr] = { t: 'n', f: c.f, z: c.formato ?? FORMATO_MONEDA };
+      }
+    });
+  });
+
+  if (opciones?.merges && opciones.merges.length > 0) {
+    ws['!merges'] = opciones.merges.map((rango) => XLSX.utils.decode_range(rango));
+  }
+  if (opciones?.anchoColumnas) {
+    ws['!cols'] = opciones.anchoColumnas.map((wch) => ({ wch }));
+  }
+  if (opciones?.altoFilas) {
+    ws['!rows'] = opciones.altoFilas.map((hpt) => ({ hpt }));
+  }
+
+  return ws;
+}
+
+/** Agrega una hoja ya construida (p. ej. con construirHojaLibre) a un libro existente. */
+export function agregarHoja(libro: XLSX.WorkBook, ws: XLSX.WorkSheet, nombre: string) {
+  XLSX.utils.book_append_sheet(libro, ws, nombre.slice(0, 31));
+}
+
+export function libroNuevo(): XLSX.WorkBook {
+  return XLSX.utils.book_new();
+}
+
 export function respuestaExcel(buffer: Buffer, nombreArchivo: string) {
   // Buffer<ArrayBufferLike> no encaja exactamente con los tipos DOM de BlobPart/BodyInit
   // en TS aunque en tiempo de ejecución es válido (Buffer es un Uint8Array) — se castea

@@ -270,6 +270,35 @@ export interface ComisionCalculada {
   porcentaje_aplicado: number;
   monto_comision: number;
   fecha_facturacion: string;
+  liquidacion_id: string | null;
+  comentario: string | null;
+}
+
+export interface DescuentoOtro {
+  concepto: string;
+  monto: number;
+  justificacion: string;
+}
+
+export interface LiquidacionComision {
+  id: string;
+  numero: string;
+  vendedor_id: string;
+  fecha_desde: string;
+  fecha_hasta: string;
+  total_comisiones: number;
+  descuento_isr: number;
+  justificacion_isr: string | null;
+  descuento_igss: number;
+  justificacion_igss: string | null;
+  descuentos_otros: DescuentoOtro[];
+  total_neto: number;
+  estado: 'PENDIENTE_PAGO' | 'PAGADA';
+  comentario_pago: string | null;
+  fecha_pago: string | null;
+  pagado_por: string | null;
+  creado_por: string | null;
+  creado_en: string;
 }
 
 export interface AuditoriaRegistro {
