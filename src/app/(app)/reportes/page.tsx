@@ -41,7 +41,7 @@ export default async function ReportesPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-800">Reporte general de cotizaciones</h1>
+        <h1 className="page-title">Reporte general de cotizaciones</h1>
         <div className="flex gap-2">
           <a href={`/api/reportes/csv?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
             ⬇️ Exportar CSV
@@ -75,14 +75,14 @@ export default async function ReportesPage({
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[880px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+            <tr className="table-head-row">
               <th className="py-2 pr-2">No.</th><th className="py-2 pr-2">Fecha</th><th className="py-2 pr-2">Cliente</th>
               <th className="py-2 pr-2">Vendedor</th><th className="py-2 pr-2">Total</th><th className="py-2 pr-2">Estado</th>
             </tr>
           </thead>
           <tbody>
             {lista.map((c) => (
-              <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+              <tr key={c.id} className="table-row-hover">
                 <td className="py-2 pr-2"><Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">{c.numero_interno}</Link></td>
                 <td className="py-2 pr-2 text-slate-500">{formatFecha(c.fecha_emision)}</td>
                 <td className="py-2 pr-2">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</td>
