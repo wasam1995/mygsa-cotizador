@@ -3,18 +3,31 @@
 @tailwind utilities;
 
 html, body {
-  background-color: #f4f6fb;
+  background-color: #f3f5f9;
+  background-image:
+    radial-gradient(at 100% 0%, rgb(31 56 100 / 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgb(232 114 12 / 0.04) 0px, transparent 50%);
+  background-attachment: fixed;
 }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 
 @media print {
   .no-print { display: none !important; }
-  body { background: white !important; }
+  body { background: white !important; background-image: none !important; }
   .print-area { box-shadow: none !important; margin: 0 !important; }
 }
 
 .input {
   @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800
-    placeholder:text-slate-400 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-100
+    placeholder:text-slate-400 transition-shadow focus:border-navy-500 focus:outline-none focus:ring-4 focus:ring-navy-500/10
     disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400;
 }
 
@@ -24,14 +37,41 @@ html, body {
 
 .btn {
   @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
-    transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100;
 }
-.btn-primary { @apply bg-navy-700 text-white hover:bg-navy-800; }
-.btn-secondary { @apply bg-white text-navy-700 border border-navy-200 hover:bg-navy-50; }
-.btn-orange { @apply bg-brand-orange text-white hover:bg-brand-orangeDark; }
-.btn-danger { @apply bg-red-600 text-white hover:bg-red-700; }
+.btn-primary { @apply bg-navy-700 text-white shadow-sm hover:bg-navy-800 hover:shadow-soft; }
+.btn-secondary { @apply border border-slate-200 bg-white text-navy-700 shadow-sm hover:border-navy-200 hover:bg-navy-50; }
+.btn-orange { @apply bg-brand-orange text-white shadow-sm hover:bg-brand-orangeDark hover:shadow-soft; }
+.btn-danger { @apply bg-red-600 text-white shadow-sm hover:bg-red-700; }
 .btn-ghost { @apply text-slate-600 hover:bg-slate-100; }
 
 .card {
-  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-card;
+  @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition-shadow;
+}
+.card-hover {
+  @apply hover:-translate-y-0.5 hover:shadow-soft;
+}
+
+/* Título principal de cada página */
+.page-title {
+  @apply text-xl font-bold tracking-tight text-slate-800;
+}
+
+/* Subtítulo de sección dentro de una tarjeta */
+.section-title {
+  @apply text-sm font-bold tracking-wide text-slate-700;
+}
+
+/* Encabezado de tabla (fila <thead>) */
+.table-head-row {
+  @apply border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400;
+}
+
+/* Fila de tabla con hover suave (fila <tbody>) */
+.table-row-hover {
+  @apply border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80;
+}
+
+.badge-dot {
+  @apply inline-block h-1.5 w-1.5 rounded-full;
 }
