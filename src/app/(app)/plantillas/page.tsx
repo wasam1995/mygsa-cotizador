@@ -12,7 +12,7 @@ export default async function PlantillasPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-slate-800">Plantillas de cotización</h1>
+      <h1 className="mb-1 page-title">Plantillas de cotización</h1>
       <p className="mb-5 text-sm text-slate-500">
         Condiciones comerciales y leyenda de pie de página que se imprimen en la cotización para el cliente. Puede tener varias
         plantillas (por ejemplo para distintos tipos de proyecto); la marcada como predeterminada es la que se usa al crear una
