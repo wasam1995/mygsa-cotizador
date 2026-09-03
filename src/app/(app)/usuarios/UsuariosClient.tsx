@@ -63,7 +63,7 @@ function SeccionUsuarios({ usuarios, roles }: { usuarios: UsuarioConRol[]; roles
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+            <tr className="table-head-row">
               <th className="py-2 pr-2">Nombre</th><th className="py-2 pr-2">Correo</th>
               <th className="py-2 pr-2">Teléfono</th><th className="py-2 pr-2">Rol</th>
               <th className="py-2 pr-2">Estado</th><th className="py-2 pr-2"></th>
@@ -173,7 +173,7 @@ function NuevoUsuarioForm({ roles, onClose }: { roles: Rol[]; onClose: () => voi
 
   return (
     <div className="card border-navy-200 bg-navy-50/40">
-      <h3 className="mb-3 text-sm font-bold text-slate-700">Nuevo usuario</h3>
+      <h3 className="mb-3 section-title">Nuevo usuario</h3>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div><label className="label">Nombre completo</label><input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} /></div>
@@ -246,7 +246,7 @@ function SeccionRoles({
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr]">
       <div className="card">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-700">Roles</h3>
+          <h3 className="section-title">Roles</h3>
           <button className="text-xs font-semibold text-orange-600 hover:underline" onClick={() => setMostrarNuevoRol(true)}>+ Nuevo</button>
         </div>
         <ul className="space-y-1">
@@ -308,7 +308,7 @@ function PermisosDeRol({
 
   return (
     <div className="card">
-      <h3 className="mb-3 text-sm font-bold text-slate-700">Permisos de: {rolNombre}</h3>
+      <h3 className="mb-3 section-title">Permisos de: {rolNombre}</h3>
       <div className="space-y-4">
         {modulos.map(([modulo, lista]) => (
           <div key={modulo}>
@@ -368,7 +368,7 @@ function NuevoRolForm({
 
   return (
     <div className="card border-orange-200 bg-orange-50/40">
-      <h3 className="mb-3 text-sm font-bold text-slate-700">Nuevo rol / perfil</h3>
+      <h3 className="mb-3 section-title">Nuevo rol / perfil</h3>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div><label className="label">Nombre visible</label><input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} /></div>

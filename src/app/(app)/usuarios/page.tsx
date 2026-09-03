@@ -27,7 +27,7 @@ export default async function UsuariosPage() {
 
   return (
     <div>
-      <h1 className="mb-5 text-xl font-bold text-slate-800">Usuarios y roles</h1>
+      <h1 className="mb-5 page-title">Usuarios y roles</h1>
       <UsuariosClient
         usuarios={(usuarios ?? []) as (Usuario & { rol: { id: string; codigo: string; nombre: string } | null })[]}
         roles={(roles ?? []) as Rol[]}
