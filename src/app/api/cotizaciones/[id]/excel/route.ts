@@ -1,25 +1,37 @@
 import { NextResponse } from 'next/server';
+import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { construirLibro, libroABuffer, respuestaExcel, formula, FORMATO_MONEDA, FORMATO_PORCENTAJE } from '@/lib/excel';
+import { construirHojaCotizacion } from '@/lib/excelCotizacion';
 import type { HojaExcel } from '@/lib/excel';
+import type { Cotizacion, ParametrosFiscales, PlantillaCotizacion } from '@/lib/types';
 
+// Excel "versión interna" — lleva información confidencial (costos, utilidad, comisión),
+// igual que el PDF interno, así que requiere el mismo permiso que ese botón
+// (COTIZACIONES_CREAR o COTIZACIONES_VER_TODAS) y no solo estar autenticado.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  await requireSesion();
+  const sesion = await requireSesion();
+  if (!sesion.permisos.includes('COTIZACIONES_CREAR') && !sesion.permisos.includes('COTIZACIONES_VER_TODAS')) {
+    return NextResponse.json({ error: 'No tiene permiso para ver la versión interna de esta cotización.' }, { status: 403 });
+  }
   const supabase = createClient();
 
   const { data: cotizacion } = await supabase
     .from('cotizaciones')
-    .select('*, cliente:clientes(nombre_razon, nit), vendedor:vendedores(nombre_completo, codigo)')
+    .select('*, cliente:clientes(nombre_razon, nit, direccion), vendedor:vendedores(nombre_completo, codigo, correo)')
     .eq('id', params.id)
     .single();
 
   if (!cotizacion) return NextResponse.json({ error: 'No encontrada' }, { status: 404 });
 
-  const [{ data: lineas }, { data: costosOperativos }, { data: parametros }] = await Promise.all([
-    supabase.from('cotizacion_detalle').select('*').eq('cotizacion_id', params.id).order('linea'),
+  const [{ data: lineas }, { data: costosOperativos }, { data: parametros }, { data: plantilla }] = await Promise.all([
+    supabase.from('cotizacion_detalle').select('*, producto:productos(unidad)').eq('cotizacion_id', params.id).order('linea'),
     supabase.from('cotizacion_costos_operativos').select('*').eq('cotizacion_id', params.id).order('orden'),
-    supabase.from('parametros_fiscales').select('iva_porcentaje, retencion_iva_porcentaje').eq('id', 1).single(),
+    supabase.from('parametros_fiscales').select('*').eq('id', 1).single(),
+    (cotizacion as any).plantilla_id
+      ? supabase.from('plantillas_cotizacion').select('*').eq('id', (cotizacion as any).plantilla_id).single()
+      : Promise.resolve({ data: null }),
   ]);
 
   const c = cotizacion as any;
@@ -135,6 +147,25 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const libro = construirLibro([hojaResumen, hojaDetalle, hojaCostos]);
   const wsResumen = libro.Sheets['Resumen'];
+
+  // Hoja "Cotización" — mismo documento que ve el vendedor internamente, con la misma
+  // estructura del PDF (encabezado, tarjetas, tabla de ítems con costo/utilidad, totales,
+  // resumen financiero, condiciones y firmas). Se agrega como PRIMERA hoja del libro; las
+  // hojas "Resumen"/"Detalle"/"Costos operativos" (con fórmulas encadenadas) se conservan
+  // después, para quien necesite auditar/recalcular los números.
+  const wsCotizacion = construirHojaCotizacion({
+    cotizacion: cotizacion as Cotizacion,
+    lineas: (lineas ?? []) as any,
+    parametros: parametros as ParametrosFiscales,
+    plantilla: (plantilla ?? null) as PlantillaCotizacion | null,
+    clienteNombre: c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? 'Consumidor Final',
+    clienteNit: c.cliente?.nit ?? c.cliente_nit,
+    clienteDireccion: c.cliente?.direccion ?? c.cliente_direccion,
+    vendedorNombre: c.vendedor?.nombre_completo ?? '—',
+    vendedorCorreo: c.vendedor?.correo ?? null,
+  }, { interna: true });
+  XLSX.utils.book_append_sheet(libro, wsCotizacion, 'Cotización');
+  libro.SheetNames.unshift(libro.SheetNames.splice(libro.SheetNames.indexOf('Cotización'), 1)[0]);
 
   const celdaMoneda = (fila: number) => { const a = `B${fila}`; if (wsResumen[a]) wsResumen[a].z = FORMATO_MONEDA; };
   const celdaPorcentaje = (fila: number) => { const a = `B${fila}`; if (wsResumen[a]) wsResumen[a].z = FORMATO_PORCENTAJE; };
