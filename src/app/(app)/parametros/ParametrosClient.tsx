@@ -1,18 +1,16 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { actualizarEscalaComision, actualizarParametros, crearEscalaComision, eliminarEscalaComision } from './actions';
+import PrintQuote from '@/components/PrintQuote';
+import PdfPreview from '@/components/PdfPreview';
+import { crearCotizacionDemo } from '@/lib/pdf/demo';
 import type { EscalaComision, ParametrosFiscales } from '@/lib/types';
 
-const FUENTES = [
-  { valor: 'Inter, ui-sans-serif, system-ui, sans-serif', etiqueta: 'Inter (moderna, por defecto)' },
-  { valor: 'Arial, Helvetica, sans-serif', etiqueta: 'Arial' },
-  { valor: 'Georgia, "Times New Roman", serif', etiqueta: 'Georgia (clásica/serif)' },
-  { valor: '"Courier New", Courier, monospace', etiqueta: 'Courier New (técnica)' },
-  { valor: '"Trebuchet MS", sans-serif', etiqueta: 'Trebuchet MS' },
-];
+// Datos de muestra para la vista previa en vivo (ver también Plantillas → editor visual).
+const DEMO = crearCotizacionDemo();
 
 export default function ParametrosClient({ parametros, escalasComision }: { parametros: ParametrosFiscales; escalasComision: EscalaComision[] }) {
   const router = useRouter();
@@ -31,6 +29,15 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
   function set<K extends keyof ParametrosFiscales>(key: K, value: ParametrosFiscales[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
+
+  // Igual que en el editor visual de Plantillas: la vista previa se actualiza con un
+  // pequeño retraso en vez de en cada tecla/cambio de color, para que no se sienta
+  // entrecortada al regenerar el PDF completo.
+  const [formPreview, setFormPreview] = useState(form);
+  useEffect(() => {
+    const t = setTimeout(() => setFormPreview(form), 400);
+    return () => clearTimeout(t);
+  }, [form]);
 
   async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0];
@@ -244,39 +251,61 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       <div className="card">
         <h2 className="mb-1 section-title">Personalización visual</h2>
         <p className="mb-3 text-xs text-slate-400">
-          Logotipo, colores corporativos y tipografía usados en las cotizaciones impresas / PDF (versión cliente e interna).
+          Logotipo y colores corporativos usados en las cotizaciones impresas / PDF (versión cliente e interna). Editor visual:
+          los cambios se reflejan en la vista previa de la derecha con datos de muestra.
         </p>
 
-        <div className="mb-4 flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-            {form.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={form.logo_url} alt="Logotipo" className="h-full w-full object-contain" />
-            ) : (
-              <span className="text-xs text-slate-400">Sin logo</span>
-            )}
-          </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
-            <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoChange} className="input" disabled={subiendoLogo} />
-            <p className="mt-1 text-xs text-slate-400">{subiendoLogo ? 'Subiendo…' : 'PNG, JPG, SVG o WEBP. Fondo transparente recomendado.'}</p>
+            <div className="mb-4 flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                {form.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.logo_url} alt="Logotipo" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-xs text-slate-400">Sin logo</span>
+                )}
+              </div>
+              <div>
+                <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoChange} className="input" disabled={subiendoLogo} />
+                <p className="mt-1 text-xs text-slate-400">{subiendoLogo ? 'Subiendo…' : 'PNG, JPG, SVG o WEBP. Fondo transparente recomendado.'}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <ColorCampo label="Primario" hint="Títulos, cabeceras" value={form.color_primario} onChange={(v) => set('color_primario', v)} />
+              <ColorCampo label="Acento" hint="Bordes destacados, tabla" value={form.color_acento} onChange={(v) => set('color_acento', v)} />
+              <ColorCampo label="Acento oscuro" hint="Totales, llamadas de atención" value={form.color_acento_oscuro} onChange={(v) => set('color_acento_oscuro', v)} />
+              <ColorCampo label="Fondo general" hint="Bloques de datos" value={form.color_fondo} onChange={(v) => set('color_fondo', v)} />
+              <ColorCampo label="Fondo alterno" hint="Totales / alertas" value={form.color_fondo_alterno} onChange={(v) => set('color_fondo_alterno', v)} />
+              <ColorCampo label="Bordes" hint="Líneas divisorias" value={form.color_borde} onChange={(v) => set('color_borde', v)} />
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              La tipografía del PDF ya no es configurable: desde la Etapa 7 los documentos se generan como PDF vectorial real
+              (texto seleccionable, archivo más liviano) con una fuente estándar incluida en cualquier lector — así ningún PDF
+              depende de descargar una fuente al generarse.
+            </p>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <ColorCampo label="Primario" hint="Títulos, cabeceras" value={form.color_primario} onChange={(v) => set('color_primario', v)} />
-          <ColorCampo label="Acento" hint="Bordes destacados, tabla" value={form.color_acento} onChange={(v) => set('color_acento', v)} />
-          <ColorCampo label="Acento oscuro" hint="Totales, llamadas de atención" value={form.color_acento_oscuro} onChange={(v) => set('color_acento_oscuro', v)} />
-          <ColorCampo label="Fondo general" hint="Bloques de datos" value={form.color_fondo} onChange={(v) => set('color_fondo', v)} />
-          <ColorCampo label="Fondo alterno" hint="Totales / alertas" value={form.color_fondo_alterno} onChange={(v) => set('color_fondo_alterno', v)} />
-          <ColorCampo label="Bordes" hint="Líneas divisorias" value={form.color_borde} onChange={(v) => set('color_borde', v)} />
-        </div>
-
-        <div className="mt-3">
-          <Campo label="Tipografía">
-            <select className="input" value={form.tipografia} onChange={(e) => set('tipografia', e.target.value)}>
-              {FUENTES.map((f) => <option key={f.valor} value={f.valor}>{f.etiqueta}</option>)}
-            </select>
-          </Campo>
+          <div className="flex flex-col">
+            <p className="label !mb-1">Vista previa en vivo (con datos de muestra)</p>
+            <div className="h-[75vh] overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <PdfPreview>
+                <PrintQuote
+                  cotizacion={DEMO.cotizacion}
+                  lineas={DEMO.lineas}
+                  parametros={formPreview}
+                  plantilla={null}
+                  clienteNombre={DEMO.cotizacion.cliente_nombre_libre ?? '—'}
+                  clienteNit={DEMO.cotizacion.cliente_nit}
+                  clienteDireccion={DEMO.cotizacion.cliente_direccion}
+                  clienteContacto={null}
+                  vendedorNombre="Ana López"
+                  vendedorCorreo="ana.lopez@mygsa.com.gt"
+                />
+              </PdfPreview>
+            </div>
+          </div>
         </div>
       </div>
 
