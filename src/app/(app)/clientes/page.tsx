@@ -12,7 +12,7 @@ export default async function ClientesPage() {
 
   return (
     <div>
-      <h1 className="mb-5 text-xl font-bold text-slate-800">Clientes</h1>
+      <h1 className="mb-5 page-title">Clientes</h1>
       <ClientesClient clientes={(data ?? []) as Cliente[]} puedeEditar={sesion.permisos.includes('CLIENTES_EDITAR')} />
     </div>
   );

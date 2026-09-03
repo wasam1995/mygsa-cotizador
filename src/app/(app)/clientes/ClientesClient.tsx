@@ -44,7 +44,7 @@ export default function ClientesClient({ clientes, puedeEditar }: { clientes: Cl
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+            <tr className="table-head-row">
               <th className="py-2 pr-2">Código</th><th className="py-2 pr-2">Nombre / Razón social</th>
               <th className="py-2 pr-2">NIT</th><th className="py-2 pr-2">Teléfono</th>
               <th className="py-2 pr-2">Contacto</th><th className="py-2 pr-2">Retenedor IVA</th>
@@ -158,7 +158,7 @@ function NuevoClienteForm({ codigoSugerido, onClose }: { codigoSugerido: string;
 
   return (
     <div className="card border-navy-200 bg-navy-50/40">
-      <h3 className="mb-3 text-sm font-bold text-slate-700">Nuevo cliente</h3>
+      <h3 className="mb-3 section-title">Nuevo cliente</h3>
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div><label className="label">Código</label><input className="input" value={codigo} onChange={(e) => setCodigo(e.target.value)} /></div>
