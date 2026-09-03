@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProductPicker from './ProductPicker';
+import PrintQuote from './PrintQuote';
+import PrintQuoteInterno from './PrintQuoteInterno';
 import { calcularCotizacion, distribuirCostosOperativosPorLinea, numeroALetras, precioPorMargen } from '@/lib/fiscal';
 import { formatQ, esTelefonoGuatemalaValido, normalizarTelefonoGuatemala } from '@/lib/utils';
 import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ModoPrecioLinea, ParametrosFiscales, PlantillaCotizacion, Producto, Vendedor } from '@/lib/types';
@@ -94,6 +96,8 @@ export default function CotizadorForm({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [vistaInterna, setVistaInterna] = useState(true);
+  const [mostrarPreview, setMostrarPreview] = useState(false);
+  const [previewTab, setPreviewTab] = useState<'cliente' | 'interno'>('cliente');
 
   const clienteSeleccionado = clientes.find((c) => c.id === clienteId) || null;
   const margenSugerido = parametros.margen_sugerido_defecto ?? 0.45;
@@ -193,25 +197,155 @@ export default function CotizadorForm({
 
   const totalEnLetras = numeroALetras(calculo.totalCotizado);
 
-  async function guardar(finalizando: boolean) {
-    setError(null);
-    if (!vendedorId) { setError('Seleccione un vendedor.'); return; }
-    if (lineas.length === 0) { setError('Agregue al menos un producto o servicio.'); return; }
-    if (clienteModo === 'catalogo' && !clienteId) { setError('Seleccione un cliente o cambie a "Cliente no catalogado".'); return; }
+  // Datos "sintéticos" para la vista previa: arman un objeto con la misma forma que
+  // PrintQuote/PrintQuoteInterno esperan (Cotizacion + líneas ya guardadas), pero
+  // calculados en vivo desde el estado del formulario — todavía no existe un registro
+  // real en la base de datos en este punto.
+  const vendedorSeleccionado = vendedores.find((v) => v.id === vendedorId) ?? (esVendedorFijo ? vendedorInicial : null);
+  const previewVendedor = {
+    nombre: vendedorSeleccionado?.nombre_completo ?? '—',
+    correo: vendedorSeleccionado?.correo ?? null,
+  };
+  const previewCliente = clienteModo === 'catalogo'
+    ? {
+      nombre: clienteSeleccionado?.nombre_razon ?? '—',
+      nit: clienteSeleccionado?.nit ?? null,
+      direccion: clienteSeleccionado?.direccion ?? null,
+      contacto: clienteSeleccionado?.contacto ?? null,
+    }
+    : {
+      nombre: clienteLibreNombre || 'Consumidor Final',
+      nit: clienteLibreNit || null,
+      direccion: clienteLibreDireccion || null,
+      contacto: null,
+    };
+  const plantillaSeleccionada = plantillas.find((p) => p.id === plantillaId) ?? null;
+
+  const cotizacionPreview: Cotizacion = {
+    id: cotOriginal?.id ?? 'preview',
+    numero_interno: cotOriginal?.numero_interno ?? '(se asigna al guardar)',
+    numero_sistema_externo: numeroSistemaExterno || null,
+    fecha_emision: cotOriginal?.fecha_emision ?? new Date().toISOString().slice(0, 10),
+    fecha_vencimiento: cotOriginal?.fecha_vencimiento ?? null,
+    vendedor_id: vendedorId,
+    vendedor_telefono: vendedorTelefono ? normalizarTelefonoGuatemala(vendedorTelefono) : null,
+    cliente_id: clienteModo === 'catalogo' ? (clienteId || null) : null,
+    cliente_nombre_libre: clienteModo === 'libre' ? clienteLibreNombre : null,
+    cliente_nit: clienteModo === 'libre' ? clienteLibreNit : null,
+    cliente_direccion: clienteModo === 'libre' ? clienteLibreDireccion : null,
+    cliente_telefono: clienteModo === 'libre' ? clienteLibreTelefono : null,
+    estado: cotOriginal?.estado ?? 'PROSPECTO',
+    subtotal: calculo.subtotalBruto,
+    descuento_global_pct: descuentoGlobalPct,
+    descuento_global_monto: descuentoGlobalMonto,
+    total_descuentos: calculo.totalDescuentos,
+    base_gravable: calculo.baseGravable,
+    iva_monto: calculo.ivaMonto,
+    total_cotizado: calculo.totalCotizado,
+    isr_retencion: calculo.isrRetencion,
+    cliente_es_retenedor_iva: clienteEsRetenedorIva,
+    iva_retencion: calculo.ivaRetencion,
+    pago_neto_empresa: calculo.pagoNetoEmpresa,
+    total_en_letras: totalEnLetras,
+    comentario: comentario || null,
+    porcentaje_descuento_efectivo: calculo.porcentajeDescuentoEfectivo,
+    requiere_autorizacion: calculo.requiereAutorizacion,
+    autorizado_por: cotOriginal?.autorizado_por ?? null,
+    autorizado_en: cotOriginal?.autorizado_en ?? null,
+    facturado_por: cotOriginal?.facturado_por ?? null,
+    facturado_en: cotOriginal?.facturado_en ?? null,
+    anulado_por: cotOriginal?.anulado_por ?? null,
+    anulado_en: cotOriginal?.anulado_en ?? null,
+    motivo_anulacion: cotOriginal?.motivo_anulacion ?? null,
+    creado_por: cotOriginal?.creado_por ?? '',
+    creado_en: cotOriginal?.creado_en ?? new Date().toISOString(),
+    actualizado_en: new Date().toISOString(),
+    costo_total_productos: calculo.costoTotalProductos,
+    costos_operativos_total: calculo.costosOperativosTotal,
+    costo_total_operacion: calculo.costoTotalOperacion,
+    utilidad_bruta: calculo.utilidadBruta,
+    utilidad_neta: calculo.utilidadNeta,
+    margen_utilidad_pct: calculo.margenUtilidadPct,
+    escala_comision_rango: calculo.escala?.rango ?? null,
+    comision_estimada_pct: calculo.comisionEstimadaPct,
+    comision_estimada_monto: calculo.comisionEstimadaMonto,
+    ganancia_neta_estimada: calculo.gananciaNetaEstimada,
+    prorratear_costos_operativos: prorratearCostosOperativos,
+    mostrar_precios_unitarios_cliente: mostrarPreciosUnitariosCliente,
+    mostrar_vendedor_cliente: mostrarVendedorCliente,
+    plantilla_id: plantillaId || null,
+  };
+
+  const lineasPreview = lineas.map((l, idx) => {
+    const producto = l.producto_id ? productos.find((p) => p.id === l.producto_id) : null;
+    return {
+      id: l.key,
+      cotizacion_id: cotOriginal?.id ?? 'preview',
+      linea: idx + 1,
+      producto_id: l.producto_id,
+      es_fuera_inventario: l.es_fuera_inventario,
+      codigo_mostrado: l.codigo_mostrado,
+      descripcion: l.descripcion,
+      cantidad: l.cantidad,
+      costo_unitario: l.costo_unitario,
+      precio_unitario: l.precio_unitario,
+      descuento_linea_pct: l.descuento_linea_pct,
+      descuento_linea_monto: l.descuento_linea_monto,
+      subtotal_linea: round2(l.cantidad * l.precio_unitario - l.descuento_linea_monto),
+      modo_precio: l.modo_precio,
+      margen_pct: l.margen_pct,
+      incluir_foto: l.incluir_foto,
+      producto: producto ? { imagen_url: producto.imagen_url, unidad: producto.unidad } : null,
+    };
+  });
+
+  const costosOperativosPreview: CotizacionCostoOperativo[] = costosOperativos.map((c, idx) => ({
+    id: c.key,
+    cotizacion_id: cotOriginal?.id ?? 'preview',
+    orden: idx + 1,
+    concepto: c.concepto,
+    cantidad: c.cantidad,
+    dias: c.dias,
+    costo_unitario: c.costo_unitario,
+  }));
+
+  // Las mismas validaciones que antes vivían directo en guardar() — separadas para
+  // poder correrlas también antes de abrir la vista previa (así no se abre sobre datos
+  // inválidos) sin duplicar la lógica.
+  function validarAntesDeGuardar(finalizando: boolean): string | null {
+    if (!vendedorId) return 'Seleccione un vendedor.';
+    if (lineas.length === 0) return 'Agregue al menos un producto o servicio.';
+    if (clienteModo === 'catalogo' && !clienteId) return 'Seleccione un cliente o cambie a "Cliente no catalogado".';
     const lineaExcedida = lineas.find((l) => l.stockDisponible !== null && l.cantidad > l.stockDisponible);
     if (lineaExcedida) {
-      setError(`"${lineaExcedida.descripcion || lineaExcedida.codigo_mostrado}" excede el inventario disponible (${lineaExcedida.stockDisponible} unidades). Ajuste la cantidad antes de guardar.`);
-      return;
+      return `"${lineaExcedida.descripcion || lineaExcedida.codigo_mostrado}" excede el inventario disponible (${lineaExcedida.stockDisponible} unidades). Ajuste la cantidad antes de guardar.`;
     }
     if (finalizando && !numeroSistemaExterno.trim()) {
-      setError('Para finalizar debe capturar el número de cotización del sistema (ERP). Puede "Guardar borrador" sin este dato.');
-      return;
+      return 'Para finalizar debe capturar el número de cotización del sistema (ERP). Puede "Guardar borrador" sin este dato.';
     }
     if (vendedorTelefono && !esTelefonoGuatemalaValido(normalizarTelefonoGuatemala(vendedorTelefono))) {
-      setError('El teléfono del vendedor debe tener el formato +502 y 8 dígitos.');
-      return;
+      return 'El teléfono del vendedor debe tener el formato +502 y 8 dígitos.';
     }
+    return null;
+  }
 
+  // Antes de guardar (o de finalizar una edición) se abre la vista previa dual —
+  // Cliente / Interna — con el documento tal como quedaría, para revisarlo antes de que
+  // sea definitivo. Guardar borrador sigue siendo directo (es un estado informal).
+  function abrirPreview() {
+    const err = validarAntesDeGuardar(true);
+    if (err) { setError(err); return; }
+    setError(null);
+    setPreviewTab('cliente');
+    setMostrarPreview(true);
+  }
+
+  async function guardar(finalizando: boolean) {
+    setError(null);
+    const err = validarAntesDeGuardar(finalizando);
+    if (err) { setError(err); return; }
+
+    setMostrarPreview(false);
     setGuardando(true);
     const payload = {
       vendedor_id: vendedorId,
@@ -685,19 +819,130 @@ export default function CotizadorForm({
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:flex-row sm:justify-end lg:-mx-8 lg:px-8">
         <button type="button" onClick={() => router.push(modoEdicion ? `/cotizaciones/${cotOriginal!.id}` : '/cotizaciones')} className="btn btn-ghost">Cancelar</button>
         {modoEdicion ? (
-          <button type="button" disabled={guardando} onClick={() => guardar(true)} className="btn btn-orange">
-            {guardando ? 'Guardando…' : 'Guardar cambios'}
+          <button type="button" disabled={guardando} onClick={abrirPreview} className="btn btn-orange">
+            {guardando ? 'Guardando…' : '👁️ Vista previa y guardar'}
           </button>
         ) : (
           <>
             <button type="button" disabled={guardando} onClick={() => guardar(false)} className="btn btn-secondary">
               Guardar borrador
             </button>
-            <button type="button" disabled={guardando} onClick={() => guardar(true)} className="btn btn-orange">
-              {guardando ? 'Guardando…' : 'Guardar y continuar'}
+            <button type="button" disabled={guardando} onClick={abrirPreview} className="btn btn-orange">
+              {guardando ? 'Guardando…' : '👁️ Vista previa y guardar'}
             </button>
           </>
         )}
+      </div>
+
+      {mostrarPreview && (
+        <PreviewGuardado
+          tab={previewTab}
+          onCambiarTab={setPreviewTab}
+          guardando={guardando}
+          onCerrar={() => setMostrarPreview(false)}
+          onConfirmar={() => guardar(true)}
+          cotizacion={cotizacionPreview}
+          lineas={lineasPreview}
+          costosOperativos={costosOperativosPreview}
+          prorrateoPorLinea={prorrateoPorLinea}
+          parametros={parametros}
+          plantilla={plantillaSeleccionada}
+          clienteNombre={previewCliente.nombre}
+          clienteNit={previewCliente.nit}
+          clienteDireccion={previewCliente.direccion}
+          clienteContacto={previewCliente.contacto}
+          vendedorNombre={previewVendedor.nombre}
+          vendedorCorreo={previewVendedor.correo}
+        />
+      )}
+    </div>
+  );
+}
+
+// Overlay de pantalla completa con la vista previa dual (Cliente / Interna) del
+// documento tal como quedaría, antes de confirmar el guardado — el usuario puede
+// alternar entre ambas versiones y solo se guarda si presiona "Confirmar y guardar".
+function PreviewGuardado({
+  tab, onCambiarTab, guardando, onCerrar, onConfirmar,
+  cotizacion, lineas, costosOperativos, prorrateoPorLinea, parametros, plantilla,
+  clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
+}: {
+  tab: 'cliente' | 'interno';
+  onCambiarTab: (t: 'cliente' | 'interno') => void;
+  guardando: boolean;
+  onCerrar: () => void;
+  onConfirmar: () => void;
+  cotizacion: Cotizacion;
+  lineas: (CotizacionDetalle & { producto: { imagen_url: string | null; unidad?: string | null } | null })[];
+  costosOperativos: CotizacionCostoOperativo[];
+  prorrateoPorLinea: number[];
+  parametros: ParametrosFiscales;
+  plantilla: PlantillaCotizacion | null;
+  clienteNombre: string;
+  clienteNit: string | null;
+  clienteDireccion: string | null;
+  clienteContacto: string | null;
+  vendedorNombre: string;
+  vendedorCorreo: string | null;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/60 p-3 sm:p-6">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 p-4">
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">Vista previa antes de guardar</h2>
+            <p className="text-xs text-slate-500">Así se vería el documento — revíselo en ambas versiones antes de confirmar.</p>
+          </div>
+          <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+            <button type="button" onClick={() => onCambiarTab('cliente')}
+              className={`rounded-md px-3 py-1.5 ${tab === 'cliente' ? 'bg-white shadow' : 'text-slate-500'}`}>
+              Versión cliente
+            </button>
+            <button type="button" onClick={() => onCambiarTab('interno')}
+              className={`rounded-md px-3 py-1.5 ${tab === 'interno' ? 'bg-white shadow' : 'text-slate-500'}`}>
+              Versión interna
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-8">
+          {tab === 'cliente' ? (
+            <PrintQuote
+              cotizacion={cotizacion}
+              lineas={lineas}
+              parametros={parametros}
+              plantilla={plantilla}
+              clienteNombre={clienteNombre}
+              clienteNit={clienteNit}
+              clienteDireccion={clienteDireccion}
+              clienteContacto={clienteContacto}
+              vendedorNombre={vendedorNombre}
+              vendedorCorreo={vendedorCorreo}
+            />
+          ) : (
+            <PrintQuoteInterno
+              cotizacion={cotizacion}
+              lineas={lineas}
+              costosOperativos={costosOperativos}
+              prorrateoPorLinea={prorrateoPorLinea}
+              parametros={parametros}
+              plantilla={plantilla}
+              clienteNombre={clienteNombre}
+              clienteNit={clienteNit}
+              clienteDireccion={clienteDireccion}
+              clienteContacto={clienteContacto}
+              vendedorNombre={vendedorNombre}
+              vendedorCorreo={vendedorCorreo}
+            />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 p-4 sm:flex-row sm:justify-end">
+          <button type="button" className="btn btn-ghost" onClick={onCerrar}>Seguir editando</button>
+          <button type="button" disabled={guardando} className="btn btn-orange" onClick={onConfirmar}>
+            {guardando ? 'Guardando…' : 'Confirmar y guardar'}
+          </button>
+        </div>
       </div>
     </div>
   );
