@@ -6,7 +6,17 @@ import { activarDesactivarPlantilla, actualizarPlantilla, crearPlantilla, marcar
 import PrintQuote from '@/components/PrintQuote';
 import PdfPreview from '@/components/PdfPreview';
 import { crearCotizacionDemo } from '@/lib/pdf/demo';
-import type { ApartadoPlantilla, ParametrosFiscales, PlantillaCotizacion } from '@/lib/types';
+import type { ApartadoPlantilla, ParametrosFiscales, PlantillaCotizacion, PosicionApartado } from '@/lib/types';
+
+// Puntos del documento donde puede caer un apartado — mismo orden en que aparecen en el
+// PDF real (ver PrintQuote.tsx / PrintQuoteInterno.tsx). "antes_condiciones" es el valor
+// por defecto (el único lugar donde se imprimían los apartados antes de esta opción).
+const POSICIONES: { value: PosicionApartado; label: string }[] = [
+  { value: 'antes_tabla', label: 'Antes de la tabla de productos' },
+  { value: 'antes_totales', label: 'Después de la tabla, antes de los totales' },
+  { value: 'antes_condiciones', label: 'Después de los totales, antes de condiciones comerciales' },
+  { value: 'despues_condiciones', label: 'Después de condiciones comerciales, antes de firmas' },
+];
 
 export default function PlantillasClient({ plantillas, parametros }: { plantillas: PlantillaCotizacion[]; parametros: ParametrosFiscales }) {
   const router = useRouter();
@@ -138,6 +148,17 @@ function FormularioPlantilla({
     set('apartados', datos.apartados.filter((_, i) => i !== idx));
   }
 
+  // Sube o baja un apartado dentro de la lista — el orden entre apartados que comparten
+  // la misma posición en el documento (ver POSICIONES abajo) se respeta tal cual queda
+  // aquí, así que esto es lo que controla exactamente dónde cae cada uno.
+  function moverApartado(idx: number, direccion: -1 | 1) {
+    const destino = idx + direccion;
+    if (destino < 0 || destino >= datos.apartados.length) return;
+    const copia = [...datos.apartados];
+    [copia[idx], copia[destino]] = [copia[destino], copia[idx]];
+    set('apartados', copia);
+  }
+
   const plantillaPreview: PlantillaCotizacion = {
     id: inicial?.id ?? 'preview',
     es_predeterminada: inicial?.es_predeterminada ?? false,
@@ -167,17 +188,31 @@ function FormularioPlantilla({
             <label className="label !mb-0">Apartados adicionales</label>
             <button type="button" onClick={agregarApartado} className="text-xs font-semibold text-navy-600 hover:underline">+ Agregar apartado</button>
           </div>
-          <p className="mb-1 text-xs text-slate-400">Bloques de título + texto libre que se imprimen antes de las condiciones comerciales (alcance del proyecto, garantía, forma de pago, etc.).</p>
+          <p className="mb-1 text-xs text-slate-400">Bloques de título + texto libre — vos elegís en qué parte del documento cae cada uno, y el orden entre los que comparten lugar (con las flechas ▲▼).</p>
           <div className="space-y-2">
             {datos.apartados.map((a, idx) => (
               <div key={idx} className="rounded-lg border border-slate-200 bg-white p-2">
                 <div className="mb-1 flex items-center gap-2">
+                  <div className="flex flex-col">
+                    <button type="button" disabled={idx === 0} onClick={() => moverApartado(idx, -1)}
+                      className="leading-none text-slate-400 hover:text-navy-600 disabled:opacity-20" title="Subir">▲</button>
+                    <button type="button" disabled={idx === datos.apartados.length - 1} onClick={() => moverApartado(idx, 1)}
+                      className="leading-none text-slate-400 hover:text-navy-600 disabled:opacity-20" title="Bajar">▼</button>
+                  </div>
                   <input className="input flex-1" placeholder="Título del apartado" value={a.titulo} onChange={(e) => actualizarApartado(idx, { titulo: e.target.value })} />
                   <button type="button" onClick={() => eliminarApartado(idx)} className="text-slate-400 hover:text-red-600">✕</button>
                 </div>
                 <textarea className="input min-h-[60px] text-xs" placeholder="Contenido" value={a.contenido} onChange={(e) => actualizarApartado(idx, { contenido: e.target.value })} />
+                <div className="mt-1">
+                  <label className="label !mb-0.5 !text-[11px]">Dónde se imprime</label>
+                  <select className="input !py-1 text-xs" value={a.posicion ?? 'antes_condiciones'}
+                    onChange={(e) => actualizarApartado(idx, { posicion: e.target.value as PosicionApartado })}>
+                    {POSICIONES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
               </div>
             ))}
+            {datos.apartados.length === 0 && <p className="text-xs text-slate-400">Sin apartados adicionales todavía.</p>}
           </div>
         </div>
         <div>
