@@ -57,3 +57,52 @@ export async function registrarEntradaInventario(productoId: string, cantidad: n
   revalidatePath('/inventario/kardex');
   return { ok: true };
 }
+
+// Desglose de a qué cotizaciones (y vendedores) corresponde el "Reservado" de un
+// producto — todo lo que aún no llega a Facturado ni Anulado sigue reservando stock,
+// pero antes no había forma de ver el detalle desde Inventario, solo el número total.
+export async function obtenerReservasProducto(productoId: string) {
+  await requireSesion('INVENTARIO_VER');
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('cotizacion_detalle')
+    .select('cantidad, cotizacion:cotizaciones(numero_interno, numero_sistema_externo, estado, cliente_nombre_libre, cliente:clientes(nombre_razon), vendedor:vendedores(nombre_completo))')
+    .eq('producto_id', productoId)
+    .not('cotizacion_id', 'is', null);
+
+  if (error) return { error: error.message };
+
+  const filas = (data ?? [])
+    .map((f: any) => {
+      const c = Array.isArray(f.cotizacion) ? f.cotizacion[0] : f.cotizacion;
+      if (!c || c.estado === 'FACTURADO' || c.estado === 'ANULADO') return null;
+      const cliente = Array.isArray(c.cliente) ? c.cliente[0] : c.cliente;
+      const vendedor = Array.isArray(c.vendedor) ? c.vendedor[0] : c.vendedor;
+      return {
+        numero: c.numero_sistema_externo || c.numero_interno,
+        estado: c.estado as string,
+        cliente: cliente?.nombre_razon ?? c.cliente_nombre_libre ?? 'Consumidor Final',
+        vendedor: vendedor?.nombre_completo ?? '—',
+        cantidad: Number(f.cantidad),
+      };
+    })
+    .filter((f): f is NonNullable<typeof f> => f !== null);
+
+  return { ok: true, reservas: filas };
+}
+
+// "Botón de reinicio": recalcula stock_reservado (desde las cotizaciones activas) y
+// stock_actual (desde el último movimiento real del kardex) de TODOS los productos, para
+// corregir cualquier desajuste — por ejemplo, si algo quedó mal tras pruebas o una edición
+// manual. No borra ni modifica cotizaciones, comisiones ni el historial: solo corrige los
+// dos números de existencia en app.productos para que vuelvan a cuadrar con la realidad.
+export async function recalcularStockInventario() {
+  await requireSesion('INVENTARIO_EDITAR');
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('recalcular_stock_productos');
+  if (error) return { error: error.message };
+  const resultado = Array.isArray(data) ? data[0] : data;
+  revalidatePath('/inventario');
+  revalidatePath('/inventario/kardex');
+  return { ok: true, actualizados: resultado?.actualizados ?? 0, sinCambios: resultado?.sin_cambios ?? 0 };
+}

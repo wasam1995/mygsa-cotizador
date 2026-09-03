@@ -4,8 +4,17 @@ import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatQ } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { actualizarProducto, crearProducto, registrarEntradaInventario } from './actions';
+import { actualizarProducto, crearProducto, registrarEntradaInventario, obtenerReservasProducto, recalcularStockInventario } from './actions';
 import type { Producto } from '@/lib/types';
+
+type Reserva = { numero: string; estado: string; cliente: string; vendedor: string; cantidad: number };
+
+const ESTADO_LABEL: Record<string, string> = {
+  PROSPECTO: 'Prospecto',
+  PEND_AUTORIZAR: 'Pend. autorizar',
+  ENVIADO_CLIENTE: 'Enviada a cliente',
+  AUTORIZADO_CLIENTE: 'Cliente aprobó',
+};
 
 // Sube una foto de producto al bucket público "productos" y devuelve su URL pública.
 async function subirFotoProducto(archivo: File): Promise<string> {
@@ -26,6 +35,24 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
   const [editando, setEditando] = useState<string | null>(null);
   const [entradaPara, setEntradaPara] = useState<string | null>(null);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [reservasAbiertas, setReservasAbiertas] = useState<string | null>(null);
+  const [mostrarConfirmarRecalculo, setMostrarConfirmarRecalculo] = useState(false);
+  const [recalculando, setRecalculando] = useState(false);
+  const [mensajeRecalculo, setMensajeRecalculo] = useState<string | null>(null);
+
+  async function handleRecalcular() {
+    setRecalculando(true);
+    const r = await recalcularStockInventario();
+    setRecalculando(false);
+    setMostrarConfirmarRecalculo(false);
+    if (r?.error) setMensajeRecalculo(`Error: ${r.error}`);
+    else setMensajeRecalculo(
+      r.actualizados > 0
+        ? `Listo — se corrigieron ${r.actualizados} producto(s). ${r.sinCambios} ya estaban correctos.`
+        : `Todo cuadraba correctamente — no hubo que corregir ningún producto.`
+    );
+    router.refresh();
+  }
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -39,9 +66,36 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
         <input className="input max-w-xs" placeholder="Buscar código o nombre…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         <div className="flex gap-2">
           <a href="/api/inventario/excel" className="btn btn-secondary">⬇️ Exportar Excel</a>
+          {puedeEditar && <button className="btn btn-secondary" onClick={() => setMostrarConfirmarRecalculo(true)}>🔄 Recalcular stock</button>}
           {puedeEditar && <button className="btn btn-orange" onClick={() => setMostrarNuevo(true)}>+ Nuevo producto</button>}
         </div>
       </div>
+
+      {mensajeRecalculo && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          {mensajeRecalculo}
+          <button className="ml-3 text-xs font-semibold underline" onClick={() => setMensajeRecalculo(null)}>Cerrar</button>
+        </div>
+      )}
+
+      {mostrarConfirmarRecalculo && (
+        <div className="card border-sky-200 bg-sky-50">
+          <p className="text-sm font-bold text-sky-800">¿Recalcular el stock de todos los productos?</p>
+          <p className="mt-1 text-sm text-sky-700">
+            Esto recorre todo el inventario y corrige dos cosas por producto: el <b>Reservado</b> (se recalcula desde
+            las cotizaciones activas ahora mismo) y la <b>Existencia</b> (se restablece al último movimiento real
+            registrado en el kardex). Es la forma de &quot;reiniciar&quot; los efectos en inventario si algo quedó
+            descuadrado por pruebas o una edición manual. No modifica ni borra cotizaciones, comisiones ni el
+            historial de movimientos — es seguro correrlo cuantas veces haga falta.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button disabled={recalculando} className="btn btn-primary" onClick={handleRecalcular}>
+              {recalculando ? 'Recalculando…' : 'Sí, recalcular ahora'}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setMostrarConfirmarRecalculo(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
 
       {mostrarNuevo && <NuevoProductoForm onClose={() => { setMostrarNuevo(false); router.refresh(); }} />}
 
@@ -64,6 +118,8 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
                 <FilaProducto key={p.id} p={p} disponible={disponible} margen={margen} puedeEditar={puedeEditar}
                   editando={editando === p.id} onEditar={() => setEditando(p.id)} onCerrarEdicion={() => { setEditando(null); router.refresh(); }}
                   entradaAbierta={entradaPara === p.id} onEntrada={() => setEntradaPara(p.id)} onCerrarEntrada={() => { setEntradaPara(null); router.refresh(); }}
+                  reservasAbiertas={reservasAbiertas === p.id}
+                  onToggleReservas={() => setReservasAbiertas(reservasAbiertas === p.id ? null : p.id)}
                 />
               );
             })}
@@ -76,10 +132,12 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
 
 function FilaProducto({
   p, disponible, margen, puedeEditar, editando, onEditar, onCerrarEdicion, entradaAbierta, onEntrada, onCerrarEntrada,
+  reservasAbiertas, onToggleReservas,
 }: {
   p: Producto; disponible: number; margen: number; puedeEditar: boolean;
   editando: boolean; onEditar: () => void; onCerrarEdicion: () => void;
   entradaAbierta: boolean; onEntrada: () => void; onCerrarEntrada: () => void;
+  reservasAbiertas: boolean; onToggleReservas: () => void;
 }) {
   const [costo, setCosto] = useState(p.costo_unitario);
   const [precio, setPrecio] = useState(p.precio_lista);
@@ -91,6 +149,20 @@ function FilaProducto({
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorFoto, setErrorFoto] = useState<string | null>(null);
   const fotoRef = useRef<HTMLInputElement>(null);
+  const [reservas, setReservas] = useState<Reserva[] | null>(null);
+  const [cargandoReservas, setCargandoReservas] = useState(false);
+  const [errorReservas, setErrorReservas] = useState<string | null>(null);
+
+  async function handleToggleReservas() {
+    onToggleReservas();
+    if (!reservasAbiertas && reservas === null) {
+      setCargandoReservas(true);
+      setErrorReservas(null);
+      const r = await obtenerReservasProducto(p.id);
+      setCargandoReservas(false);
+      if (r?.error) setErrorReservas(r.error); else setReservas(r?.reservas ?? []);
+    }
+  }
 
   async function handleFoto(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0];
@@ -121,7 +193,15 @@ function FilaProducto({
           </div>
         </td>
         <td className="py-2 pr-2">{p.stock_actual}</td>
-        <td className="py-2 pr-2">{p.stock_reservado}</td>
+        <td className="py-2 pr-2">
+          {p.stock_reservado > 0 ? (
+            <button className="font-semibold text-amber-700 underline decoration-dotted underline-offset-2" onClick={handleToggleReservas}>
+              {p.stock_reservado} {reservasAbiertas ? '▲' : '▼'}
+            </button>
+          ) : (
+            <span>0</span>
+          )}
+        </td>
         <td className={`py-2 pr-2 font-semibold ${disponible <= p.stock_minimo ? 'text-red-600' : 'text-emerald-700'}`}>{disponible}</td>
         <td className="py-2 pr-2">{formatQ(p.costo_unitario)}</td>
         <td className="py-2 pr-2">{formatQ(p.precio_lista)}</td>
@@ -133,6 +213,42 @@ function FilaProducto({
           </td>
         )}
       </tr>
+      {reservasAbiertas && (
+        <tr className="bg-amber-50">
+          <td colSpan={puedeEditar ? 9 : 8} className="p-3">
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-700">Cotizaciones que reservan este producto</p>
+            {cargandoReservas && <p className="text-sm text-slate-500">Cargando…</p>}
+            {errorReservas && <p className="text-sm text-red-600">{errorReservas}</p>}
+            {!cargandoReservas && !errorReservas && reservas && reservas.length === 0 && (
+              <p className="text-sm text-slate-500">
+                No se encontraron cotizaciones activas con reserva — si el número no cuadra, use el botón &quot;Recalcular stock&quot; arriba para corregirlo.
+              </p>
+            )}
+            {!cargandoReservas && reservas && reservas.length > 0 && (
+              <table className="w-full max-w-3xl text-sm">
+                <thead>
+                  <tr className="border-b border-amber-200 text-left text-xs uppercase text-amber-700">
+                    <th className="py-1 pr-2">Cotización</th><th className="py-1 pr-2">Estado</th>
+                    <th className="py-1 pr-2">Cliente</th><th className="py-1 pr-2">Vendedor</th>
+                    <th className="py-1 pr-2 text-right">Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reservas.map((r, idx) => (
+                    <tr key={idx} className="border-b border-amber-100 last:border-0">
+                      <td className="py-1 pr-2 font-mono text-xs text-slate-600">{r.numero}</td>
+                      <td className="py-1 pr-2 text-slate-600">{ESTADO_LABEL[r.estado] ?? r.estado}</td>
+                      <td className="py-1 pr-2">{r.cliente}</td>
+                      <td className="py-1 pr-2">{r.vendedor}</td>
+                      <td className="py-1 pr-2 text-right font-semibold">{r.cantidad}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </td>
+        </tr>
+      )}
       {editando && (
         <tr className="bg-slate-50">
           <td colSpan={9} className="p-3">
