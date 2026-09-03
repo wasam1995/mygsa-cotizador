@@ -25,7 +25,7 @@ export default async function NuevaCotizacionPage() {
 
   return (
     <div>
-      <h1 className="mb-5 text-xl font-bold text-slate-800">Nueva cotización</h1>
+      <h1 className="mb-5 page-title">Nueva cotización</h1>
       <CotizadorForm
         vendedores={(vendedores ?? []) as Vendedor[]}
         clientes={(clientes ?? []) as Cliente[]}
