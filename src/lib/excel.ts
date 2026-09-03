@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 // relleno/fuente de las celdas (negritas, fondos de color, etc.) NO se escribe en el
 // archivo de salida — SheetJS solo soporta estilos de celda (fills, fonts, colores) en su
 // edición de paga "Pro". Por eso la paleta de colores corporativa de la cotización se
-// aplica al 100% en el PDF (que sí soporta color, vía html2canvas) pero en el Excel el
+// aplica al 100% en el PDF (que sí soporta color, generado con @react-pdf/renderer) pero en el Excel el
 // libro se entrega con cuadrícula estándar de Excel (visible por defecto) y las celdas
 // de encabezado/totales resaltadas únicamente con el texto en mayúsculas y el signo "Q"
 // del formato de moneda — no con relleno de color. Lo que SÍ está 100% soportado y
