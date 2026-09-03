@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import PrintQuote from '@/components/PrintQuote';
 import PrintQuoteInterno from '@/components/PrintQuoteInterno';
+import PdfPreview from '@/components/PdfPreview';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
 import { distribuirCostosOperativosPorLinea } from '@/lib/fiscal';
@@ -54,8 +55,7 @@ export default function DetalleClient({
   const [eliminando, setEliminando] = useState(false);
   const [mostrarConfirmarEliminar, setMostrarConfirmarEliminar] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState<'cliente' | 'interno' | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
-  const printRefInterno = useRef<HTMLDivElement>(null);
+  const [abriendoPdf, setAbriendoPdf] = useState<'cliente' | 'interno' | null>(null);
 
   const puedeVerInterno = permisos.includes('COTIZACIONES_CREAR') || permisos.includes('COTIZACIONES_VER_TODAS');
 
@@ -109,79 +109,64 @@ export default function DetalleClient({
     if (url) window.open(url, '_blank');
   }
 
-  // Genera un PDF real (descargable) a partir de una vista de impresión (cliente o
-  // interna), capturándola como imagen con html2canvas y armando el archivo con jsPDF
-  // en A4 vertical, con márgenes reales (15mm arriba/lados, 20mm abajo) y paginación
-  // automática con "Página X de Y" en el pie. Ambos nodos (PrintQuote y
-  // PrintQuoteInterno) siempre están montados — visibles solo cuando corresponde, o
-  // fuera de pantalla en caso contrario — así que no hace falta cambiar de pestaña.
+  // Arma el documento @react-pdf/renderer (cliente o interno) a partir de los mismos
+  // datos ya cargados en pantalla — un solo lugar define el contenido, compartido entre
+  // la vista previa en pantalla (<PdfPreview>), la descarga y "Abrir/Imprimir".
+  function construirDocumento(version: 'cliente' | 'interno') {
+    return version === 'interno' ? (
+      <PrintQuoteInterno
+        cotizacion={cotizacion} lineas={lineas} costosOperativos={costosOperativos}
+        prorrateoPorLinea={prorrateoPorLinea} parametros={parametros} plantilla={plantilla}
+        clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
+        clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
+      />
+    ) : (
+      <PrintQuote
+        cotizacion={cotizacion} lineas={lineas} parametros={parametros} plantilla={plantilla}
+        clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
+        clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
+      />
+    );
+  }
+
+  // Descarga un PDF real y vectorial (texto seleccionable, tamaño de archivo pequeño,
+  // paginación nativa) generado por @react-pdf/renderer a partir del documento — ya no
+  // hace falta "capturar" nada en pantalla como con html2canvas/jsPDF: el PDF se arma
+  // directamente en memoria a partir de los datos.
   async function handleDescargarPDF(version: 'cliente' | 'interno') {
     setError(null);
     setGenerandoPdf(version);
     try {
-      const nodo = version === 'interno' ? printRefInterno.current : printRef.current;
-      if (!nodo) throw new Error('No se pudo preparar la vista para exportar.');
-
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
-
-      // html2canvas tiene un problema conocido con elementos "position: fixed" ubicados
-      // fuera de pantalla (como el nodo de impresión, que vive en left:-9999px para no
-      // interferir con la vista normal): si no se corrige el scroll, termina capturando
-      // el viewport visible completo (menús, botones, tarjetas internas) en vez del
-      // documento real — así es como aparecía información de más y todo diminuto. Se
-      // corrige forzando el scroll a 0,0 antes de capturar y pasando scrollX/scrollY en 0
-      // para que html2canvas recorte exactamente el nodo indicado.
-      window.scrollTo(0, 0);
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const canvas = await html2canvas(nodo, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: document.documentElement.clientWidth,
-        windowHeight: document.documentElement.clientHeight,
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-
-      const MM = 2.834645669; // pt por mm
-      const margenSup = 15 * MM, margenLado = 15 * MM, margenInf = 20 * MM;
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth - margenLado * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const alturaUtilPorPagina = pageHeight - margenSup - margenInf;
-
-      let alturaRestante = imgHeight;
-      let corrimiento = 0;
-      pdf.addImage(imgData, 'PNG', margenLado, margenSup, imgWidth, imgHeight);
-      alturaRestante -= alturaUtilPorPagina;
-      while (alturaRestante > 0) {
-        corrimiento += alturaUtilPorPagina;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', margenLado, margenSup - corrimiento, imgWidth, imgHeight);
-        alturaRestante -= alturaUtilPorPagina;
-      }
-
-      const totalPaginas = pdf.getNumberOfPages();
-      for (let i = 1; i <= totalPaginas; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(8);
-        pdf.setTextColor(120, 120, 120);
-        pdf.text(parametros.nombre_comercial || parametros.razon_social, margenLado, pageHeight - margenInf + 16);
-        pdf.text(`Página ${i} de ${totalPaginas}`, pageWidth - margenLado, pageHeight - margenInf + 16, { align: 'right' });
-      }
-
+      const { pdf } = await import('@react-pdf/renderer');
+      const blob = await pdf(construirDocumento(version)).toBlob();
       const base = (cotizacion.numero_sistema_externo || cotizacion.numero_interno).replace(/[^a-zA-Z0-9-]/g, '_');
-      pdf.save(version === 'interno' ? `${base}_INTERNO.pdf` : `${base}.pdf`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = version === 'interno' ? `${base}_INTERNO.pdf` : `${base}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
-      setError('No se pudo generar el PDF. Intente de nuevo o use "Imprimir" del navegador.');
+      setError('No se pudo generar el PDF. Intente de nuevo.');
     } finally {
       setGenerandoPdf(null);
+    }
+  }
+
+  // Abre el PDF en una pestaña nueva usando el visor nativo del navegador — desde ahí el
+  // usuario puede imprimirlo o guardarlo con los controles propios del visor (más
+  // confiable entre navegadores que forzar window.print() sobre la página).
+  async function handleAbrirPDF(version: 'cliente' | 'interno') {
+    setError(null);
+    setAbriendoPdf(version);
+    try {
+      const { pdf } = await import('@react-pdf/renderer');
+      const blob = await pdf(construirDocumento(version)).toBlob();
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch (e) {
+      setError('No se pudo abrir el PDF. Intente de nuevo.');
+    } finally {
+      setAbriendoPdf(null);
     }
   }
 
@@ -196,7 +181,9 @@ export default function DetalleClient({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge estado={cotizacion.estado} />
-          <button onClick={() => window.print()} className="btn btn-secondary">🖨️ Imprimir</button>
+          <button onClick={() => handleAbrirPDF('cliente')} disabled={abriendoPdf !== null} className="btn btn-secondary">
+            {abriendoPdf === 'cliente' ? 'Abriendo…' : '🖨️ Abrir / imprimir'}
+          </button>
           <button onClick={() => handleDescargarPDF('cliente')} disabled={generandoPdf !== null} className="btn btn-secondary">
             {generandoPdf === 'cliente' ? 'Generando…' : '⬇️ PDF cliente'}
           </button>
@@ -314,7 +301,7 @@ export default function DetalleClient({
       {/* Tabs */}
       <div className="flex gap-2 no-print">
         <button onClick={() => setTab('interno')} className={`btn ${tab === 'interno' ? 'btn-primary' : 'btn-secondary'}`}>Resumen interno</button>
-        <button onClick={() => setTab('impresion')} className={`btn ${tab === 'impresion' ? 'btn-primary' : 'btn-secondary'}`}>Vista de impresión</button>
+        <button onClick={() => setTab('impresion')} className={`btn ${tab === 'impresion' ? 'btn-primary' : 'btn-secondary'}`}>Vista previa (PDF)</button>
       </div>
 
       {tab === 'interno' ? (
@@ -478,34 +465,12 @@ export default function DetalleClient({
             </div>
           )}
         </div>
-      ) : null}
-
-      {/* El nodo de impresión siempre está montado para que "Descargar PDF" funcione
-          sin importar la pestaña activa: visible en "Vista de impresión", o fuera de
-          pantalla (nunca con display:none, que html2canvas no puede capturar) si el
-          usuario está viendo "Resumen interno". */}
-      <div
-        ref={printRef}
-        className={tab === 'impresion' ? '' : 'no-print pointer-events-none fixed -left-[9999px] top-0'}
-        aria-hidden={tab !== 'impresion'}
-      >
-        <PrintQuote
-          cotizacion={cotizacion} lineas={lineas} parametros={parametros} plantilla={plantilla}
-          clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
-          clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
-        />
-      </div>
-
-      {/* Versión interna (confidencial) — solo se usa para generar el "PDF interno";
-          nunca se muestra en pantalla, así que siempre queda fuera de pantalla. */}
-      {puedeVerInterno && (
-        <div ref={printRefInterno} className="no-print pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">
-          <PrintQuoteInterno
-            cotizacion={cotizacion} lineas={lineas} costosOperativos={costosOperativos}
-            prorrateoPorLinea={prorrateoPorLinea} parametros={parametros} plantilla={plantilla}
-            clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
-            clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
-          />
+      ) : (
+        // Vista previa (PDF): el PDF real embebido con el visor nativo del navegador —
+        // exactamente el mismo documento que se descarga, sin ninguna versión "aproximada"
+        // de por medio. Solo se monta mientras esta pestaña está activa.
+        <div className="card no-print h-[80vh] overflow-hidden !p-0">
+          <PdfPreview>{construirDocumento('cliente')}</PdfPreview>
         </div>
       )}
     </div>
