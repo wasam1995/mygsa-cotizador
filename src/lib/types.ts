@@ -78,6 +78,8 @@ export interface Producto {
   observacion: string | null;
   imagen_url: string | null;
   especificaciones: string | null;
+  descripcion: string | null;
+  proveedor: string | null;
 }
 
 export interface ParametrosFiscales {
