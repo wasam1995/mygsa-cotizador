@@ -25,7 +25,7 @@ export default async function AuditoriaPage({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-slate-800">Bitácora de auditoría</h1>
+        <h1 className="page-title">Bitácora de auditoría</h1>
         <p className="text-sm text-slate-500">Quién creó, modificó o eliminó cada registro clave del sistema (cotizaciones, productos, clientes, vendedores, usuarios y roles).</p>
       </div>
 

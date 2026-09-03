@@ -44,7 +44,7 @@ export default function AuditoriaClient({ registros }: { registros: AuditoriaReg
     <div className="card overflow-x-auto">
       <table className="w-full min-w-[820px] text-sm">
         <thead>
-          <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+          <tr className="table-head-row">
             <th className="py-2 pr-2">Fecha</th><th className="py-2 pr-2">Tabla</th>
             <th className="py-2 pr-2">Acción</th><th className="py-2 pr-2">Usuario</th>
             <th className="py-2 pr-2">Registro</th><th className="py-2 pr-2"></th>
@@ -56,7 +56,7 @@ export default function AuditoriaClient({ registros }: { registros: AuditoriaReg
             const diffs = calcularDiferencias(r.datos_anteriores, r.datos_nuevos);
             return (
               <Fragment key={r.id}>
-                <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <tr className="table-row-hover">
                   <td className="py-2 pr-2 text-slate-500">{formatFecha(r.creado_en)}</td>
                   <td className="py-2 pr-2 font-mono text-xs">{r.tabla}</td>
                   <td className="py-2 pr-2"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ACCION_COLOR[r.accion]}`}>{ACCION_LABEL[r.accion] ?? r.accion}</span></td>
