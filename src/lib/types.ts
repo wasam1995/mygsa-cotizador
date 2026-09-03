@@ -113,9 +113,16 @@ export interface ParametrosFiscales {
   tipografia: string;
 }
 
+// Dónde se imprime el apartado dentro del documento — ver PrintQuote.tsx /
+// PrintQuoteInterno.tsx para el orden real de las secciones fijas. Si no se especifica
+// (plantillas guardadas antes de esta opción), se asume 'antes_condiciones' — el
+// comportamiento que tenía siempre esta lista antes de poder elegir posición.
+export type PosicionApartado = 'antes_tabla' | 'antes_totales' | 'antes_condiciones' | 'despues_condiciones';
+
 export interface ApartadoPlantilla {
   titulo: string;
   contenido: string;
+  posicion?: PosicionApartado;
 }
 
 export interface PlantillaCotizacion {
