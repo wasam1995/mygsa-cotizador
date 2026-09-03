@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache';
 
 export async function actualizarProducto(id: string, patch: {
   nombre?: string; costo_unitario?: number; precio_lista?: number; stock_actual?: number; stock_minimo?: number; activo?: boolean;
-  imagen_url?: string | null; especificaciones?: string | null;
+  imagen_url?: string | null; especificaciones?: string | null; unidad?: string;
+  descripcion?: string | null; proveedor?: string | null;
 }) {
   await requireSesion('INVENTARIO_EDITAR');
   const supabase = createClient();
@@ -20,6 +21,7 @@ export async function crearProducto(payload: {
   codigo: string; nombre: string; color_variante: string | null; unidad: string;
   costo_unitario: number; precio_lista: number; stock_actual: number;
   imagen_url?: string | null; especificaciones?: string | null;
+  descripcion?: string | null; proveedor?: string | null;
 }) {
   const sesion = await requireSesion('INVENTARIO_EDITAR');
   const supabase = createClient();

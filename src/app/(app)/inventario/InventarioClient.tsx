@@ -143,6 +143,9 @@ function FilaProducto({
   const [precio, setPrecio] = useState(p.precio_lista);
   const [imagenUrl, setImagenUrl] = useState(p.imagen_url ?? '');
   const [especificaciones, setEspecificaciones] = useState(p.especificaciones ?? '');
+  const [unidad, setUnidad] = useState(p.unidad);
+  const [descripcion, setDescripcion] = useState(p.descripcion ?? '');
+  const [proveedor, setProveedor] = useState(p.proveedor ?? '');
   const [cantEntrada, setCantEntrada] = useState(0);
   const [comentEntrada, setComentEntrada] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -255,6 +258,8 @@ function FilaProducto({
             <div className="flex flex-wrap items-end gap-3">
               <div><label className="label">Costo unitario</label><input type="number" step="0.01" className="input w-32" value={costo} onChange={(e) => setCosto(Number(e.target.value))} /></div>
               <div><label className="label">Precio lista</label><input type="number" step="0.01" className="input w-32" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} /></div>
+              <div><label className="label">Unidad de medida</label><input className="input w-32" placeholder="unidad, m2, kg…" value={unidad} onChange={(e) => setUnidad(e.target.value)} /></div>
+              <div className="min-w-[220px] flex-1"><label className="label">Proveedor (opcional)</label><input className="input" value={proveedor} onChange={(e) => setProveedor(e.target.value)} /></div>
               <div className="min-w-[260px] flex-1">
                 <label className="label">Foto del producto</label>
                 <div className="flex items-center gap-2">
@@ -268,11 +273,13 @@ function FilaProducto({
                 {errorFoto && <p className="mt-0.5 text-xs text-red-600">{errorFoto}</p>}
               </div>
               <div className="min-w-[220px] flex-1"><label className="label">Especificaciones (opcional)</label><input className="input" placeholder="Medidas, material, etc." value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} /></div>
+              <div className="min-w-[260px] flex-1"><label className="label">Descripción (opcional)</label><input className="input" placeholder="Texto general/comercial del producto" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></div>
               <button disabled={guardando} className="btn btn-primary" onClick={async () => {
                 setGuardando(true);
                 await actualizarProducto(p.id, {
-                  costo_unitario: costo, precio_lista: precio,
+                  costo_unitario: costo, precio_lista: precio, unidad: unidad.trim() || 'unidad',
                   imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
+                  descripcion: descripcion.trim() || null, proveedor: proveedor.trim() || null,
                 });
                 setGuardando(false);
                 onCerrarEdicion();
@@ -307,11 +314,14 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [color, setColor] = useState('');
+  const [unidad, setUnidad] = useState('unidad');
   const [costo, setCosto] = useState(0);
   const [precio, setPrecio] = useState(0);
   const [stock, setStock] = useState(0);
   const [imagenUrl, setImagenUrl] = useState('');
   const [especificaciones, setEspecificaciones] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [proveedor, setProveedor] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -338,9 +348,11 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
         <input className="input" placeholder="Código (INV-032)" value={codigo} onChange={(e) => setCodigo(e.target.value)} />
         <input className="input sm:col-span-2" placeholder="Nombre del producto" value={nombre} onChange={(e) => setNombre(e.target.value)} />
         <input className="input" placeholder="Color / variante (opcional)" value={color} onChange={(e) => setColor(e.target.value)} />
+        <input className="input" placeholder="Unidad de medida (unidad, m2, kg…)" value={unidad} onChange={(e) => setUnidad(e.target.value)} />
         <input type="number" step="0.01" className="input" placeholder="Costo" value={costo} onChange={(e) => setCosto(Number(e.target.value))} />
         <input type="number" step="0.01" className="input" placeholder="Precio lista" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} />
         <input type="number" step="1" className="input" placeholder="Stock inicial" value={stock} onChange={(e) => setStock(Number(e.target.value))} />
+        <input className="input" placeholder="Proveedor (opcional)" value={proveedor} onChange={(e) => setProveedor(e.target.value)} />
         <div className="sm:col-span-2">
           <div className="flex items-center gap-2">
             {imagenUrl && (
@@ -352,14 +364,16 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
           {subiendoFoto && <p className="mt-0.5 text-xs text-slate-400">Subiendo foto…</p>}
         </div>
         <input className="input" placeholder="Especificaciones (opcional)" value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} />
+        <input className="input sm:col-span-2" placeholder="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
       </div>
       <div className="mt-3 flex gap-2">
         <button disabled={guardando} className="btn btn-orange" onClick={async () => {
           if (!codigo || !nombre) { setError('Código y nombre son obligatorios.'); return; }
           setGuardando(true);
           const r = await crearProducto({
-            codigo, nombre, color_variante: color || null, unidad: 'unidad', costo_unitario: costo, precio_lista: precio, stock_actual: stock,
+            codigo, nombre, color_variante: color || null, unidad: unidad.trim() || 'unidad', costo_unitario: costo, precio_lista: precio, stock_actual: stock,
             imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
+            descripcion: descripcion.trim() || null, proveedor: proveedor.trim() || null,
           });
           setGuardando(false);
           if (r?.error) setError(r.error); else onClose();
