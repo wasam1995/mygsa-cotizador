@@ -83,12 +83,49 @@ export async function actualizarPermisosRol(rolId: string, permisoCodigos: strin
   await requireSesion('USUARIOS_ADMINISTRAR');
   const supabase = createClient();
 
-  await supabase.from('roles_permisos').delete().eq('rol_id', rolId);
+  // Antes esta función no revisaba el resultado de ninguna de las dos operaciones, así
+  // que un error (por ejemplo de permisos o de conexión) se tragaba en silencio y la
+  // pantalla igual mostraba "Permisos actualizados." aunque no se hubiera guardado nada.
+  const { error: errDelete } = await supabase.from('roles_permisos').delete().eq('rol_id', rolId);
+  if (errDelete) return { error: `No se pudieron actualizar los permisos: ${errDelete.message}` };
+
   if (permisoCodigos.length > 0) {
-    const { data: permisos } = await supabase.from('permisos').select('id, codigo').in('codigo', permisoCodigos);
+    const { data: permisos, error: errSel } = await supabase.from('permisos').select('id, codigo').in('codigo', permisoCodigos);
+    if (errSel) return { error: `No se pudieron actualizar los permisos: ${errSel.message}` };
     const filas = (permisos ?? []).map((p) => ({ rol_id: rolId, permiso_id: p.id }));
-    if (filas.length > 0) await supabase.from('roles_permisos').insert(filas);
+    if (filas.length > 0) {
+      const { error: errIns } = await supabase.from('roles_permisos').insert(filas);
+      if (errIns) return { error: `No se pudieron guardar los permisos: ${errIns.message}` };
+    }
   }
+  revalidatePath('/usuarios');
+  return { ok: true };
+}
+
+// Elimina definitivamente un usuario (perfil + acceso de inicio de sesión). Solo es
+// posible si no tiene historial asociado (cotizaciones creadas/autorizadas/facturadas/
+// anuladas por él, adjuntos subidos, etc.) — esas relaciones son RESTRICT a propósito
+// para no perder trazabilidad. Si tiene historial, se debe usar "Desactivar" en su lugar.
+export async function eliminarUsuario(usuarioId: string) {
+  const sesion = await requireSesion('USUARIOS_ADMINISTRAR');
+  if (usuarioId === sesion.userId) return { error: 'No puede eliminar su propio usuario.' };
+
+  const supabase = createClient();
+  const { error } = await supabase.from('usuarios').delete().eq('id', usuarioId);
+  if (error) {
+    if (error.code === '23503') {
+      return { error: 'Este usuario tiene cotizaciones u otro historial asociado (creadas, autorizadas, facturadas o anuladas por él) — no se puede eliminar. Use "Desactivar" en su lugar para quitarle el acceso sin perder el historial.' };
+    }
+    return { error: error.message };
+  }
+
+  const admin = createAdminClient();
+  const { error: errAuth } = await admin.auth.admin.deleteUser(usuarioId);
+  if (errAuth) {
+    revalidatePath('/usuarios');
+    return { error: `Se eliminó el perfil pero no se pudo eliminar el acceso de inicio de sesión: ${errAuth.message}` };
+  }
+
   revalidatePath('/usuarios');
   return { ok: true };
 }

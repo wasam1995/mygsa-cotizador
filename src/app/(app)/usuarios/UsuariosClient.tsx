@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  activarDesactivarUsuario, actualizarPermisosRol, cambiarRolUsuario, crearRol, crearUsuario,
+  activarDesactivarUsuario, actualizarPermisosRol, cambiarRolUsuario, crearRol, crearUsuario, eliminarUsuario,
 } from './actions';
 import type { Permiso, Rol, Usuario } from '@/lib/types';
 
@@ -84,49 +84,78 @@ function SeccionUsuarios({ usuarios, roles }: { usuarios: UsuarioConRol[]; roles
 function FilaUsuario({ u, roles, onCambio }: { u: UsuarioConRol; roles: Rol[]; onCambio: () => void }) {
   const [rolId, setRolId] = useState(u.rol_id);
   const [guardando, setGuardando] = useState(false);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+
+  async function handleEliminar() {
+    setGuardando(true);
+    setErrorEliminar(null);
+    const r = await eliminarUsuario(u.id);
+    setGuardando(false);
+    setConfirmandoEliminar(false);
+    if (r?.error) setErrorEliminar(r.error); else onCambio();
+  }
 
   return (
-    <tr className="border-b border-slate-100 last:border-0">
-      <td className="py-2 pr-2 font-medium">{u.nombre_completo}</td>
-      <td className="py-2 pr-2 text-slate-500">{u.correo}</td>
-      <td className="py-2 pr-2 text-slate-500">{u.telefono ?? '—'}</td>
-      <td className="py-2 pr-2">
-        <select
-          className="input w-44"
-          value={rolId}
-          disabled={guardando}
-          onChange={async (e) => {
-            const nuevo = e.target.value;
-            setRolId(nuevo);
-            setGuardando(true);
-            await cambiarRolUsuario(u.id, nuevo);
-            setGuardando(false);
-            onCambio();
-          }}
-        >
-          {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-        </select>
-      </td>
-      <td className="py-2 pr-2">
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${u.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
-          {u.activo ? 'Activo' : 'Inactivo'}
-        </span>
-      </td>
-      <td className="py-2 pr-2">
-        <button
-          className="text-xs font-semibold text-navy-600 hover:underline"
-          disabled={guardando}
-          onClick={async () => {
-            setGuardando(true);
-            await activarDesactivarUsuario(u.id, !u.activo);
-            setGuardando(false);
-            onCambio();
-          }}
-        >
-          {u.activo ? 'Desactivar' : 'Activar'}
-        </button>
-      </td>
-    </tr>
+    <>
+      <tr className="border-b border-slate-100 last:border-0">
+        <td className="py-2 pr-2 font-medium">{u.nombre_completo}</td>
+        <td className="py-2 pr-2 text-slate-500">{u.correo}</td>
+        <td className="py-2 pr-2 text-slate-500">{u.telefono ?? '—'}</td>
+        <td className="py-2 pr-2">
+          <select
+            className="input w-44"
+            value={rolId}
+            disabled={guardando}
+            onChange={async (e) => {
+              const nuevo = e.target.value;
+              setRolId(nuevo);
+              setGuardando(true);
+              await cambiarRolUsuario(u.id, nuevo);
+              setGuardando(false);
+              onCambio();
+            }}
+          >
+            {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+          </select>
+        </td>
+        <td className="py-2 pr-2">
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${u.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+            {u.activo ? 'Activo' : 'Inactivo'}
+          </span>
+        </td>
+        <td className="py-2 pr-2 whitespace-nowrap">
+          <button
+            className="mr-2 text-xs font-semibold text-navy-600 hover:underline"
+            disabled={guardando}
+            onClick={async () => {
+              setGuardando(true);
+              await activarDesactivarUsuario(u.id, !u.activo);
+              setGuardando(false);
+              onCambio();
+            }}
+          >
+            {u.activo ? 'Desactivar' : 'Activar'}
+          </button>
+          {!confirmandoEliminar ? (
+            <button className="text-xs font-semibold text-red-500 hover:underline" disabled={guardando} onClick={() => setConfirmandoEliminar(true)}>
+              Eliminar
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs">
+              ¿Eliminar?
+              <button className="font-semibold text-red-600 hover:underline" disabled={guardando} onClick={handleEliminar}>Sí</button>
+              <button className="text-slate-400 hover:underline" disabled={guardando} onClick={() => setConfirmandoEliminar(false)}>No</button>
+            </span>
+          )}
+        </td>
+      </tr>
+      {errorEliminar && (
+        <tr className="border-b border-slate-100 last:border-0 bg-red-50">
+          <td colSpan={6} className="px-2 py-2 text-xs text-red-700">{errorEliminar}</td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -242,7 +271,14 @@ function SeccionRoles({
       )}
 
       {!mostrarNuevoRol && rolSeleccionado && (
+        // key={rolSeleccionado} es lo que faltaba: sin esto, React reutiliza la misma
+        // instancia del componente al cambiar de rol y su useState(permisosActuales)
+        // queda "congelado" con los permisos del PRIMER rol que se mostró — por eso
+        // los cambios de permisos de un rol podían terminar guardándose (o mostrándose)
+        // sobre otro. Con key, React desmonta y vuelve a montar el componente entero
+        // cada vez que cambia el rol seleccionado, así el estado siempre arranca limpio.
         <PermisosDeRol
+          key={rolSeleccionado}
           rolId={rolSeleccionado}
           rolNombre={roles.find((r) => r.id === rolSeleccionado)?.nombre ?? ''}
           modulos={modulos}
@@ -260,6 +296,7 @@ function PermisosDeRol({
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set(permisosActuales));
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function alternar(codigo: string) {
     setSeleccionados((prev) => {
@@ -288,6 +325,7 @@ function PermisosDeRol({
         ))}
       </div>
       {mensaje && <p className="mt-3 text-sm text-emerald-600">{mensaje}</p>}
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       <div className="mt-4">
         <button
           disabled={guardando}
@@ -295,8 +333,10 @@ function PermisosDeRol({
           onClick={async () => {
             setGuardando(true);
             setMensaje(null);
-            await actualizarPermisosRol(rolId, [...seleccionados]);
+            setError(null);
+            const r = await actualizarPermisosRol(rolId, [...seleccionados]);
             setGuardando(false);
+            if (r?.error) { setError(r.error); return; }
             setMensaje('Permisos actualizados.');
             onGuardado();
           }}
