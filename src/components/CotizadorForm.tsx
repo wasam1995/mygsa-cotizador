@@ -384,7 +384,7 @@ export default function CotizadorForm({
       {/* Encabezado */}
       <div className="card grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-sm font-bold text-slate-700">Datos de la cotización</h2>
+          <h2 className="mb-3 section-title">Datos de la cotización</h2>
           <div className="space-y-3">
             <div>
               <label className="label">No. de cotización del sistema (ERP)</label>
@@ -439,7 +439,7 @@ export default function CotizadorForm({
 
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-700">Datos del cliente</h2>
+            <h2 className="section-title">Datos del cliente</h2>
             <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
               <button type="button" onClick={() => setClienteModo('catalogo')}
                 className={`rounded-md px-2.5 py-1 ${clienteModo === 'catalogo' ? 'bg-white shadow' : 'text-slate-500'}`}>
@@ -494,7 +494,7 @@ export default function CotizadorForm({
 
       {/* Productos */}
       <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Productos y servicios</h2>
+        <h2 className="mb-3 section-title">Productos y servicios</h2>
         <p className="mb-3 text-xs text-slate-400">
           Los precios que se digitan aquí <b>ya incluyen IVA</b> (es el precio final que paga el cliente).
         </p>
@@ -508,7 +508,7 @@ export default function CotizadorForm({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1120px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+              <tr className="table-head-row">
                 <th className="py-2 pr-2">Código</th>
                 <th className="py-2 pr-2">Descripción</th>
                 <th className="py-2 pr-2 w-20">Cant.</th>
@@ -608,7 +608,7 @@ export default function CotizadorForm({
       <div className="card">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-bold text-slate-700">Costos operativos adicionales del proyecto</h2>
+            <h2 className="section-title">Costos operativos adicionales del proyecto</h2>
             <p className="text-xs text-slate-400">Opcional: hospedaje, viáticos, combustible, mano de obra, instalación, etc. Uso interno — nunca se muestra al cliente, pero sí resta de la utilidad y de la comisión.</p>
           </div>
           <div className="flex gap-2">
@@ -625,7 +625,7 @@ export default function CotizadorForm({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                <tr className="table-head-row">
                   <th className="py-2 pr-2">Concepto</th>
                   <th className="py-2 pr-2 w-32">Cant. (personas/unid.)</th>
                   <th className="py-2 pr-2 w-32">Días/noches/tiempos</th>
@@ -664,7 +664,7 @@ export default function CotizadorForm({
             <input type="checkbox" checked={prorratearCostosOperativos} onChange={(e) => setProrratearCostosOperativos(e.target.checked)} />
             Prorratear estos costos entre los productos de la tabla (solo para la vista interna; no cambia la utilidad total)
           </label>
-          <span className="text-sm font-bold text-slate-700">
+          <span className="section-title">
             Total gastos operativos adicionales: {formatQ(calculo.costosOperativosTotal)}
           </span>
         </div>
@@ -688,7 +688,7 @@ export default function CotizadorForm({
 
       {/* Descuentos y resumen */}
       <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Descuento sobre el subtotal</h2>
+        <h2 className="mb-3 section-title">Descuento sobre el subtotal</h2>
         <div className="grid grid-cols-2 gap-3 sm:max-w-md">
           <div>
             <label className="label">Descuento global (%)</label>
@@ -722,7 +722,7 @@ export default function CotizadorForm({
 
       {/* Qué ve el cliente */}
       <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-700">Qué ve el cliente</h2>
+        <h2 className="mb-3 section-title">Qué ve el cliente</h2>
         <div className="flex flex-col gap-2 text-sm text-slate-600">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={mostrarPreciosUnitariosCliente} onChange={(e) => setMostrarPreciosUnitariosCliente(e.target.checked)} />
@@ -737,7 +737,7 @@ export default function CotizadorForm({
 
       <div className="card">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-700">Resumen</h2>
+          <h2 className="section-title">Resumen</h2>
           <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
             <button type="button" onClick={() => setVistaInterna(false)}
               className={`rounded-md px-2.5 py-1 ${!vistaInterna ? 'bg-white shadow' : 'text-slate-500'}`}>
