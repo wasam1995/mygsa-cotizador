@@ -93,10 +93,12 @@ export default function PrintQuote({
                 <Text style={s.logoPlaceholderTexto}>MG</Text>
               </View>
             )}
-            <View style={{ marginLeft: 8 }}>
+            <View style={s.emisorTexto}>
               <Text style={[s.emisorNombre, { color: pal.primario }]}>{parametros.nombre_comercial || parametros.razon_social}</Text>
-              <Text style={s.textoGris}>{parametros.direccion_empresa}</Text>
-              <Text style={s.textoGris}>{parametros.telefono_empresa} · {parametros.correo_empresa}</Text>
+              {parametros.direccion_empresa && <Text style={s.textoGris}>{parametros.direccion_empresa}</Text>}
+              {(parametros.telefono_empresa || parametros.correo_empresa) && (
+                <Text style={s.textoGris}>{[parametros.telefono_empresa, parametros.correo_empresa].filter(Boolean).join(' · ')}</Text>
+              )}
             </View>
           </View>
           <View style={s.cabeceraFolio}>
@@ -225,13 +227,26 @@ function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
     bannerMitad: { flex: 1, height: 8 },
     marcaAguaCapa: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
     marcaAgua: { fontSize: 56, fontWeight: 700, color: '#ef4444', opacity: 0.35, transform: 'rotate(-25deg)' },
+    // "cabecera" reparte el ancho de la página en dos mitades reales (flex: 1 en ambos
+    // lados) — antes un lado tenía maxWidth y el otro ni eso, así que un nombre de
+    // empresa o un correo de vendedor largos no envolvían línea: se salían de la hoja
+    // (vendedor) o chocaban contra el título de la derecha (visto con "COTIZACIÓN
+    // (INTERNA)", más ancho que "COTIZACIÓN"). Con flex:1 en los dos, el texto de cada
+    // lado envuelve dentro de su propia mitad en vez de invadir la otra.
     cabecera: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 12 },
-    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 320 },
-    logo: { width: 84, height: 84, objectFit: 'contain' },
+    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', flex: 1, paddingRight: 10 },
+    // Ancho fijo, SIN alto fijo: si además se fija el alto, un logo que no sea
+    // perfectamente cuadrado queda centrado dentro de esa caja (objectFit: 'contain') y
+    // dejaría un espacio vacío arriba — se ve como si el logo estuviera "más abajo" de lo
+    // que debería. Con solo el ancho, react-pdf calcula el alto real según la proporción
+    // de la imagen: la caja mide exactamente el logo, sin espacio de sobra, y con
+    // alignItems:'flex-start' arriba queda al ras del nombre de la empresa.
+    logo: { width: 110, objectFit: 'contain' },
     logoPlaceholder: { width: 84, height: 84, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     logoPlaceholderTexto: { color: '#fff', fontSize: 18, fontWeight: 700 },
+    emisorTexto: { flex: 1, marginLeft: 8 },
     emisorNombre: { fontSize: 11, fontWeight: 700, marginBottom: 2 },
-    cabeceraFolio: { alignItems: 'flex-end' },
+    cabeceraFolio: { alignItems: 'flex-end', flex: 1 },
     tituloDoc: { fontSize: 20, fontWeight: 700, marginBottom: 3 },
     textoGris: { color: '#64748b', fontSize: 8.5 },
     textoGrisOscuro: { color: '#475569', fontSize: 8.5 },

@@ -66,9 +66,9 @@ export default function PrintQuoteInterno({
                 <Text style={s.logoPlaceholderTexto}>MG</Text>
               </View>
             )}
-            <View style={{ marginLeft: 8 }}>
+            <View style={s.emisorTexto}>
               <Text style={[s.emisorNombre, { color: pal.primario }]}>{parametros.nombre_comercial || parametros.razon_social}</Text>
-              <Text style={s.textoGris}>{parametros.correo_empresa}</Text>
+              {parametros.correo_empresa && <Text style={s.textoGris}>{parametros.correo_empresa}</Text>}
             </View>
           </View>
           <View style={s.cabeceraFolio}>
@@ -209,13 +209,19 @@ function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
     bannerMitad: { flex: 1, height: 8 },
     avisoInterno: { borderRadius: 6, paddingVertical: 5, marginBottom: 12, alignItems: 'center' },
     avisoInternoTexto: { color: '#fff', fontWeight: 700, fontSize: 8, letterSpacing: 1 },
+    // Ver el comentario largo en PrintQuote.tsx: flex:1 en los dos lados evita que el
+    // nombre de la empresa o el correo del vendedor, si son largos, choquen entre sí o se
+    // salgan de la hoja — cada lado envuelve dentro de su propia mitad.
     cabecera: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 12 },
-    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', maxWidth: 320 },
-    logo: { width: 84, height: 84, objectFit: 'contain' },
+    cabeceraEmisor: { flexDirection: 'row', alignItems: 'flex-start', flex: 1, paddingRight: 10 },
+    // Solo ancho, sin alto fijo — ver PrintQuote.tsx: así la caja del logo mide su alto
+    // real (según su proporción) y no queda centrado con espacio vacío arriba.
+    logo: { width: 110, objectFit: 'contain' },
     logoPlaceholder: { width: 84, height: 84, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     logoPlaceholderTexto: { color: '#fff', fontSize: 18, fontWeight: 700 },
+    emisorTexto: { flex: 1, marginLeft: 8 },
     emisorNombre: { fontSize: 11, fontWeight: 700, marginBottom: 2 },
-    cabeceraFolio: { alignItems: 'flex-end' },
+    cabeceraFolio: { alignItems: 'flex-end', flex: 1 },
     tituloDoc: { fontSize: 18, fontWeight: 700, marginBottom: 3 },
     textoGris: { color: '#64748b', fontSize: 8.5 },
     textoGrisOscuro: { color: '#475569', fontSize: 8.5 },
