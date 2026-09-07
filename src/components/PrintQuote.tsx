@@ -3,7 +3,7 @@ import { formatQ, formatFecha } from '@/lib/utils';
 import { paletaPdf, PDF_FONT } from '@/lib/pdf/theme';
 import type { Cotizacion, CotizacionDetalle, ParametrosFiscales, PlantillaCotizacion } from '@/lib/types';
 
-type LineaConFoto = CotizacionDetalle & { producto?: { imagen_url: string | null; unidad?: string | null } | null };
+type LineaConFoto = CotizacionDetalle & { producto?: { imagen_url: string | null; unidad?: string | null; especificaciones?: string | null } | null };
 
 // Condiciones comerciales / leyenda por defecto — se usan solo como respaldo para
 // cotizaciones antiguas que quedaron sin plantilla asignada (antes de la Etapa 4).
@@ -150,6 +150,7 @@ export default function PrintQuote({
         </View>
         {lineas.map((l) => {
           const foto = l.incluir_foto ? l.producto?.imagen_url : null;
+          const especificaciones = l.incluir_especificaciones ? l.producto?.especificaciones : null;
           return (
             <View key={l.id} style={[s.tablaFila, { borderColor: pal.borde }]} wrap={false}>
               <View style={s.colFoto}>
@@ -159,7 +160,10 @@ export default function PrintQuote({
                   <View style={[s.fotoVacia, { backgroundColor: pal.fondo }]} />
                 )}
               </View>
-              <Text style={s.colDescripcion}>{l.descripcion}</Text>
+              <View style={s.colDescripcion}>
+                <Text>{l.descripcion}</Text>
+                {especificaciones && <Text style={s.especificaciones}>{especificaciones}</Text>}
+              </View>
               <Text style={s.colCant}>{l.cantidad}</Text>
               <Text style={[s.colUnidad, s.textoGris]}>{l.producto?.unidad || 'unidad'}</Text>
               {mostrarPrecios && <Text style={s.colPrecio}>{formatQ(l.precio_unitario)}</Text>}
@@ -261,6 +265,7 @@ function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
     tablaFila: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 5, alignItems: 'center' },
     colFoto: { width: 40 },
     colDescripcion: { flex: 1, paddingRight: 6 },
+    especificaciones: { marginTop: 2, fontSize: 7.5, fontStyle: 'italic', color: '#94a3b8' },
     colCant: { width: 42, textAlign: 'right' },
     colUnidad: { width: 52, textAlign: 'right' },
     colPrecio: { width: 62, textAlign: 'right' },

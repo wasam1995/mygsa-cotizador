@@ -6,7 +6,7 @@ import ProductPicker from './ProductPicker';
 import PrintQuote from './PrintQuote';
 import PrintQuoteInterno from './PrintQuoteInterno';
 import PdfPreview from './PdfPreview';
-import { calcularCotizacion, distribuirCostosOperativosPorLinea, numeroALetras, precioPorMargen } from '@/lib/fiscal';
+import { calcularCotizacion, distribuirCostosOperativosPorLinea, numeroALetras, precioPorMargen, precioPorAumentoMercado } from '@/lib/fiscal';
 import { formatQ, esTelefonoGuatemalaValido, normalizarTelefonoGuatemala } from '@/lib/utils';
 import type { Cliente, Cotizacion, CotizacionCostoOperativo, CotizacionDetalle, EscalaComision, ModoPrecioLinea, ParametrosFiscales, PlantillaCotizacion, Producto, Vendedor } from '@/lib/types';
 import { crearCotizacion, type CostoOperativoPayload, type LineaPayload } from '@/app/(app)/cotizaciones/nueva/actions';
@@ -28,6 +28,7 @@ const CONCEPTOS_SUGERIDOS = ['Hospedaje', 'Viáticos', 'Combustible', 'Mano de o
 
 export default function CotizadorForm({
   vendedores, clientes, productos, parametros, escalasComision, plantillas, esVendedorFijo, vendedorInicial, cotizacionExistente,
+  puedeVerResumenFiscal,
 }: {
   vendedores: Vendedor[];
   clientes: Cliente[];
@@ -42,6 +43,11 @@ export default function CotizadorForm({
     lineas: CotizacionDetalle[];
     costosOperativos: CotizacionCostoOperativo[];
   };
+  // El "Resumen Fiscal" (retenciones/base gravable) es información sensible que, por
+  // decisión explícita del cliente, solo deben ver Autorizador y Administrador — roles
+  // fijos, no un permiso configurable en Parámetros. Se decide en el Server Component
+  // (page.tsx) a partir de sesion.rolCodigo y se recibe ya resuelto aquí.
+  puedeVerResumenFiscal: boolean;
 }) {
   const router = useRouter();
   const cotOriginal = cotizacionExistente?.cotizacion ?? null;
@@ -86,6 +92,8 @@ export default function CotizadorForm({
       modo_precio: l.modo_precio,
       margen_pct: l.margen_pct,
       incluir_foto: l.incluir_foto,
+      precio_venta_empresa: Number(l.precio_venta_empresa),
+      incluir_especificaciones: l.incluir_especificaciones,
       // se le vuelve a sumar lo que esta misma línea ya tenía reservado, para no marcar
       // "excede stock" solo por estar editando una cotización que ya reservó esa cantidad.
       stockDisponible: prod ? prod.stock_actual - prod.stock_reservado + Number(l.cantidad) : null,
@@ -119,6 +127,8 @@ export default function CotizadorForm({
       modo_precio: 'FIJO',
       margen_pct: margenSugerido,
       incluir_foto: false,
+      precio_venta_empresa: Number(p.precio_lista),
+      incluir_especificaciones: false,
       stockDisponible: p.stock_actual - p.stock_reservado,
     }]);
   }
@@ -138,6 +148,8 @@ export default function CotizadorForm({
       modo_precio: 'FIJO',
       margen_pct: margenSugerido,
       incluir_foto: false,
+      precio_venta_empresa: 0,
+      incluir_especificaciones: false,
       stockDisponible: null,
     }]);
   }
@@ -156,7 +168,16 @@ export default function CotizadorForm({
       if (patch.descuento_linea_pct !== undefined) {
         actualizada.descuento_linea_monto = round2(actualizada.cantidad * actualizada.precio_unitario * (patch.descuento_linea_pct / 100));
       }
-      // en modo "Costo + Margen", el precio se recalcula solo a partir del costo y el margen
+      // Modo vigente "% aumento precio de mercado": el precio se recalcula a partir del
+      // Precio de Venta Empresa (precio fijo de referencia) y el % de aumento — nunca a
+      // partir del costo.
+      if (actualizada.modo_precio === 'AUMENTO_MERCADO'
+          && (patch.precio_venta_empresa !== undefined || patch.margen_pct !== undefined || patch.modo_precio !== undefined)) {
+        actualizada.precio_unitario = precioPorAumentoMercado(actualizada.precio_venta_empresa, actualizada.margen_pct ?? 0);
+      }
+      // "Costo + margen %" — modo anterior, se conserva solo para poder seguir editando
+      // líneas de cotizaciones ya guardadas con este modo (ya no se ofrece para líneas
+      // nuevas, ver el <select> de "Modo de precio" más abajo).
       if (actualizada.modo_precio === 'COSTO_MARGEN' && (patch.costo_unitario !== undefined || patch.margen_pct !== undefined || patch.modo_precio !== undefined)) {
         actualizada.precio_unitario = precioPorMargen(actualizada.costo_unitario, actualizada.margen_pct ?? margenSugerido);
       }
@@ -296,7 +317,9 @@ export default function CotizadorForm({
       modo_precio: l.modo_precio,
       margen_pct: l.margen_pct,
       incluir_foto: l.incluir_foto,
-      producto: producto ? { imagen_url: producto.imagen_url, unidad: producto.unidad } : null,
+      precio_venta_empresa: l.precio_venta_empresa,
+      incluir_especificaciones: l.incluir_especificaciones,
+      producto: producto ? { imagen_url: producto.imagen_url, unidad: producto.unidad, especificaciones: producto.especificaciones } : null,
     };
   });
 
@@ -507,18 +530,20 @@ export default function CotizadorForm({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-sm">
+          <table className="w-full min-w-[1320px] text-sm">
             <thead>
               <tr className="table-head-row">
                 <th className="py-2 pr-2">Código</th>
                 <th className="py-2 pr-2">Descripción</th>
                 <th className="py-2 pr-2 w-20">Cant.</th>
                 <th className="py-2 pr-2 w-24">Costo U.</th>
+                <th className="py-2 pr-2 w-28">Precio Venta Empresa</th>
                 <th className="py-2 pr-2 w-36">Modo de precio</th>
                 <th className="py-2 pr-2 w-28">Precio U. (c/IVA)</th>
                 <th className="py-2 pr-2 w-20">Desc. %</th>
                 <th className="py-2 pr-2 w-28">Subtotal</th>
                 <th className="py-2 pr-2 w-16 text-center">Foto</th>
+                <th className="py-2 pr-2 w-16 text-center">Espec.</th>
                 <th className="w-8"></th>
               </tr>
             </thead>
@@ -563,11 +588,27 @@ export default function CotizadorForm({
                              onChange={(e) => actualizarLinea(l.key, { costo_unitario: Number(e.target.value) })} />
                     </td>
                     <td className="py-2 pr-2">
+                      <input type="number" min={0} step="0.01" className="input" value={l.precio_venta_empresa}
+                             disabled={!l.es_fuera_inventario}
+                             title="Precio de venta base de catálogo — es la referencia sobre la que se calcula el modo &quot;% aumento precio de mercado&quot;."
+                             onChange={(e) => actualizarLinea(l.key, { precio_venta_empresa: Number(e.target.value) })} />
+                    </td>
+                    <td className="py-2 pr-2">
                       <select className="input" value={l.modo_precio}
                               onChange={(e) => actualizarLinea(l.key, { modo_precio: e.target.value as ModoPrecioLinea })}>
                         <option value="FIJO">Precio fijo</option>
-                        <option value="COSTO_MARGEN">Costo + margen %</option>
+                        <option value="AUMENTO_MERCADO">% aumento precio de mercado</option>
+                        {l.modo_precio === 'COSTO_MARGEN' && (
+                          <option value="COSTO_MARGEN">Costo + margen % (modo anterior)</option>
+                        )}
                       </select>
+                      {l.modo_precio === 'AUMENTO_MERCADO' && (
+                        <div className="mt-1 flex items-center gap-1">
+                          <input type="number" min={0} max={999} step="0.1" className="input" value={round1((l.margen_pct ?? 0) * 100)}
+                                 onChange={(e) => actualizarLinea(l.key, { margen_pct: Number(e.target.value) / 100 })} />
+                          <span className="text-xs text-slate-400">% aumento</span>
+                        </div>
+                      )}
                       {l.modo_precio === 'COSTO_MARGEN' && (
                         <div className="mt-1 flex items-center gap-1">
                           <input type="number" min={0} max={99} step="0.1" className="input" value={round1((l.margen_pct ?? margenSugerido) * 100)}
@@ -578,7 +619,7 @@ export default function CotizadorForm({
                     </td>
                     <td className="py-2 pr-2">
                       <input type="number" min={0} step="0.01" className="input" value={l.precio_unitario}
-                             disabled={l.modo_precio === 'COSTO_MARGEN'}
+                             disabled={l.modo_precio === 'COSTO_MARGEN' || l.modo_precio === 'AUMENTO_MERCADO'}
                              onChange={(e) => actualizarLinea(l.key, { precio_unitario: Number(e.target.value) })} />
                     </td>
                     <td className="py-2 pr-2">
@@ -591,6 +632,11 @@ export default function CotizadorForm({
                              title={producto?.imagen_url ? 'Incluir la foto de este producto en la cotización' : 'Este producto no tiene foto cargada en Inventario'}
                              onChange={(e) => actualizarLinea(l.key, { incluir_foto: e.target.checked })} />
                     </td>
+                    <td className="py-2 pr-2 text-center">
+                      <input type="checkbox" checked={l.incluir_especificaciones} disabled={!producto?.especificaciones}
+                             title={producto?.especificaciones ? 'Incluir las especificaciones de este producto en la cotización' : 'Este producto no tiene especificaciones cargadas en Inventario'}
+                             onChange={(e) => actualizarLinea(l.key, { incluir_especificaciones: e.target.checked })} />
+                    </td>
                     <td className="py-2 text-right">
                       <button type="button" onClick={() => eliminarLinea(l.key)} className="text-slate-400 hover:text-red-600">✕</button>
                     </td>
@@ -598,9 +644,20 @@ export default function CotizadorForm({
                 );
               })}
               {lineas.length === 0 && (
-                <tr><td colSpan={10} className="py-8 text-center text-slate-400">Busque un producto del inventario o agregue uno fuera de inventario.</td></tr>
+                <tr><td colSpan={12} className="py-8 text-center text-slate-400">Busque un producto del inventario o agregue uno fuera de inventario.</td></tr>
               )}
             </tbody>
+            {lineas.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-slate-300">
+                  <td colSpan={8} className="py-2 pr-2 text-right font-bold text-slate-700">TOTAL</td>
+                  <td className="py-2 pr-2 font-bold text-slate-800">
+                    {formatQ(round2(lineas.reduce((acc, l) => acc + round2(l.cantidad * l.precio_unitario - l.descuento_linea_monto), 0)))}
+                  </td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
@@ -766,46 +823,73 @@ export default function CotizadorForm({
             <p className="text-xs text-slate-400">Esta es la información que ve el cliente: sin costos, márgenes ni comisiones{!mostrarVendedorCliente ? ', ni el nombre del vendedor' : ''}.</p>
           </dl>
         ) : (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className={`grid grid-cols-1 gap-6 ${puedeVerResumenFiscal ? 'lg:grid-cols-2' : ''}`}>
+            {/* El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+                Administrador — decisión explícita del cliente, no un permiso configurable. */}
+            {puedeVerResumenFiscal && (
+              <div>
+                <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Resumen fiscal (Guatemala)</h3>
+                <dl className="space-y-1.5 text-sm">
+                  <Fila label="Subtotal (con IVA)" valor={calculo.subtotalBruto} />
+                  <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
+                  <Fila label="Total cotizado (incluye IVA)" valor={calculo.totalCotizado} negrita />
+                  <Fila label="Base gravable (sin IVA)" valor={calculo.baseGravable} />
+                  <Fila label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={calculo.ivaMonto} />
+                  <hr className="my-2 border-slate-200" />
+                  <Fila label="Retención ISR" valor={-calculo.isrRetencion} tono="text-red-600" />
+                  <Fila label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}% del IVA)`} valor={-calculo.ivaRetencion} tono="text-red-600" />
+                  <Fila label="Pago neto a la empresa" valor={calculo.pagoNetoEmpresa} negrita tono="text-emerald-700" />
+                </dl>
+              </div>
+            )}
             <div>
-              <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Resumen fiscal (Guatemala)</h3>
+              <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Detalle de determinación de Comisiones</h3>
               <dl className="space-y-1.5 text-sm">
-                <Fila label="Subtotal (con IVA)" valor={calculo.subtotalBruto} />
-                <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
-                <Fila label="Total cotizado (incluye IVA)" valor={calculo.totalCotizado} negrita />
-                <Fila label="Base gravable (sin IVA)" valor={calculo.baseGravable} />
-                <Fila label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={calculo.ivaMonto} />
+                <Fila label="Total Cotización (Prospecto)" valor={calculo.totalCotizado} negrita />
+                <Fila label="(−) Costo total de operación" valor={-calculo.costoTotalOperacion} tono="text-red-600" negrita />
+                <div className="pl-4 text-xs text-slate-500">
+                  <Fila label="(+) Costo total de productos/servicios" valor={calculo.costoTotalProductos} />
+                  <Fila label="(+) Gastos operativos adicionales" valor={calculo.costosOperativosTotal} />
+                </div>
+                <Fila label="(−) Impuestos" valor={-(calculo.ivaMonto + calculo.isrRetencion)} tono="text-red-600" negrita />
+                <div className="pl-4 text-xs text-slate-500">
+                  <Fila label="Impuesto al Valor Agregado (IVA)" valor={calculo.ivaMonto} />
+                  <Fila label="Impuesto Sobre la Renta (ISR)" valor={calculo.isrRetencion} />
+                </div>
                 <hr className="my-2 border-slate-200" />
-                <Fila label="Retención ISR" valor={-calculo.isrRetencion} tono="text-red-600" />
-                <Fila label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}% del IVA)`} valor={-calculo.ivaRetencion} tono="text-red-600" />
-                <Fila label="Pago neto a la empresa" valor={calculo.pagoNetoEmpresa} negrita tono="text-emerald-700" />
-              </dl>
-            </div>
-            <div>
-              <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Utilidad y comisión (uso interno)</h3>
-              <dl className="space-y-1.5 text-sm">
-                <Fila label="Costo total de productos/servicios" valor={calculo.costoTotalProductos} />
-                <Fila label="+ Gastos operativos adicionales" valor={calculo.costosOperativosTotal} />
-                <Fila label="= Costo total de operación" valor={calculo.costoTotalOperacion} negrita />
-                <Fila label="Utilidad bruta (venta sin IVA - costo)" valor={calculo.utilidadBruta} negrita tono="text-navy-700" />
-                <Fila label="− Retención ISR" valor={-calculo.isrRetencion} tono="text-red-600" />
-                <Fila label="= Utilidad neta (base de comisión)" valor={calculo.utilidadNeta} negrita tono="text-navy-700" />
+                <Fila label="= Utilidad Neta (Base para comisión)" valor={calculo.utilidadNeta} negrita grande tono="text-navy-700" />
                 <div className="flex justify-between text-sm text-slate-600"><dt>% Margen de utilidad (neta)</dt><dd className="font-semibold">{(calculo.margenUtilidadPct * 100).toFixed(2)}%</dd></div>
-                <div className="flex justify-between text-sm text-slate-600">
+
+                {/* Tabla aparte que explica cómo se llegó a ese % de margen y a la escala
+                    aplicada — separada del desglose numérico de arriba, como se pidió. */}
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                  <p className="mb-1 font-semibold text-slate-700">¿Por qué se calcula así?</p>
+                  <p>
+                    La comisión del vendedor se paga sobre la <b>Utilidad Neta</b>, no sobre el total cotizado —
+                    así la comisión nunca se calcula sobre dinero que en realidad se va en costos, gastos operativos
+                    o impuestos.
+                  </p>
+                  <p className="mt-1.5"><b>Fórmula:</b> Utilidad Neta = Total Cotización − Costo total de operación − Impuestos (IVA + ISR).</p>
+                  <p className="mt-1.5"><b>Campos que se usan:</b> Total Cotización (con IVA), Costo total de productos/servicios, Gastos operativos adicionales, IVA, Retención ISR.</p>
+                  <p className="mt-1.5">
+                    Con los valores de esta cotización: {formatQ(calculo.totalCotizado)} − {formatQ(calculo.costoTotalOperacion)} − ({formatQ(calculo.ivaMonto)} + {formatQ(calculo.isrRetencion)}) = <b>{formatQ(calculo.utilidadNeta)}</b>,
+                    que representa el <b>{(calculo.margenUtilidadPct * 100).toFixed(2)}%</b> de la venta neta base (sin IVA). Ese % decide en qué <b>escala de comisión</b> (Parámetros) cae la cotización.
+                  </p>
+                </div>
+
+                <div className="mt-2 flex justify-between text-sm text-slate-600">
                   <dt>Escala de comisión aplicada</dt>
                   <dd className="font-semibold">{calculo.escala ? `Rango ${calculo.escala.rango} (${(calculo.escala.desde_pct * 100).toFixed(0)}%${calculo.escala.hasta_pct != null ? ` - ${(calculo.escala.hasta_pct * 100).toFixed(0)}%` : '+'})` : '—'}</dd>
                 </div>
                 <div className="flex justify-between text-sm text-slate-600"><dt>% Comisión al vendedor</dt><dd className="font-semibold">{(calculo.comisionEstimadaPct * 100).toFixed(2)}%</dd></div>
+                <Fila label="Comisión estimada" valor={calculo.comisionEstimadaMonto} negrita tono="text-navy-700" />
+                {calculo.escala?.observacion && (
+                  <p className="text-xs italic text-slate-400">({calculo.escala.observacion})</p>
+                )}
                 <hr className="my-2 border-slate-200" />
                 <Fila label="Ganancia neta estimada para la empresa" valor={calculo.gananciaNetaEstimada} negrita grande tono="text-emerald-700" />
-                <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs leading-relaxed text-slate-500">
-                  Explicación: la utilidad neta ({formatQ(calculo.utilidadNeta)}) representa el {(calculo.margenUtilidadPct * 100).toFixed(2)}% de la venta neta base (sin IVA).
-                  Ese % cae en el <b>Rango {calculo.escala?.rango ?? '—'}</b> de la escala de comisiones (Parámetros), que paga <b>{(calculo.comisionEstimadaPct * 100).toFixed(2)}%</b> sobre
-                  la utilidad neta → {formatQ(calculo.utilidadNeta)} × {(calculo.comisionEstimadaPct * 100).toFixed(2)}% = <b>{formatQ(calculo.comisionEstimadaMonto)}</b> de comisión.
-                  {calculo.escala?.observacion ? ` (${calculo.escala.observacion})` : ''}
-                </p>
                 <div className={`mt-3 rounded-lg border p-3 text-center ${calculo.comisionEstimadaMonto > 0 ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Su comisión será de</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Comisión estimada</p>
                   <p className={`text-2xl font-black ${calculo.comisionEstimadaMonto > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{formatQ(calculo.comisionEstimadaMonto)}</p>
                   {calculo.escala?.rango === 1 && (
                     <p className="mt-1 text-xs text-amber-700">Esta cotización requiere aprobación gerencial (margen dentro del Rango 1).</p>
@@ -874,7 +958,7 @@ function PreviewGuardado({
   onCerrar: () => void;
   onConfirmar: () => void;
   cotizacion: Cotizacion;
-  lineas: (CotizacionDetalle & { producto: { imagen_url: string | null; unidad?: string | null } | null })[];
+  lineas: (CotizacionDetalle & { producto: { imagen_url: string | null; unidad?: string | null; especificaciones?: string | null } | null })[];
   costosOperativos: CotizacionCostoOperativo[];
   prorrateoPorLinea: number[];
   parametros: ParametrosFiscales;
