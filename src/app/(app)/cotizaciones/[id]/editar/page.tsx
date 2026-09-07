@@ -37,6 +37,8 @@ export default async function EditarCotizacionPage({ params }: { params: { id: s
   const vendedorInicial = esVendedorFijo
     ? (vendedores ?? []).find((v) => v.id === sesion.vendedorId) ?? null
     : null;
+  // Resumen Fiscal: roles fijos (decisión explícita del cliente, no un permiso configurable).
+  const puedeVerResumenFiscal = sesion.rolCodigo === 'ADMINISTRADOR' || sesion.rolCodigo === 'AUTORIZADOR';
 
   return (
     <div>
@@ -57,6 +59,7 @@ export default async function EditarCotizacionPage({ params }: { params: { id: s
         plantillas={(plantillas ?? []) as PlantillaCotizacion[]}
         esVendedorFijo={esVendedorFijo}
         vendedorInicial={vendedorInicial as Vendedor | null}
+        puedeVerResumenFiscal={puedeVerResumenFiscal}
         cotizacionExistente={{
           cotizacion: cotizacion as Cotizacion,
           lineas: (lineas ?? []) as CotizacionDetalle[],
