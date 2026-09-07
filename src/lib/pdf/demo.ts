@@ -88,6 +88,8 @@ export function crearCotizacionDemo(): { cotizacion: Cotizacion; lineas: (Cotiza
     modo_precio: 'FIJO',
     margen_pct: null,
     incluir_foto: false,
+    precio_venta_empresa: l.precio_unitario,
+    incluir_especificaciones: false,
     producto: null,
   }));
 
