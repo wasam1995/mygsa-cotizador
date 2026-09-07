@@ -29,7 +29,7 @@ async function subirFotoProducto(archivo: File): Promise<string> {
   return data.publicUrl;
 }
 
-export default function InventarioClient({ productos, puedeEditar }: { productos: Producto[]; puedeEditar: boolean }) {
+export default function InventarioClient({ productos, puedeEditar, puedeVerCostosEmpresa }: { productos: Producto[]; puedeEditar: boolean; puedeVerCostosEmpresa: boolean }) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState('');
   const [editando, setEditando] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
         </div>
       )}
 
-      {mostrarNuevo && <NuevoProductoForm onClose={() => { setMostrarNuevo(false); router.refresh(); }} />}
+      {mostrarNuevo && <NuevoProductoForm onClose={() => { setMostrarNuevo(false); router.refresh(); }} puedeVerCostosEmpresa={puedeVerCostosEmpresa} />}
 
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
@@ -107,6 +107,7 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
               <th className="py-2 pr-2">Stock</th><th className="py-2 pr-2">Reservado</th>
               <th className="py-2 pr-2">Disponible</th><th className="py-2 pr-2">Costo</th>
               <th className="py-2 pr-2">Precio</th><th className="py-2 pr-2">Margen</th>
+              {puedeVerCostosEmpresa && <th className="py-2 pr-2">Costo Empresa</th>}
               {puedeEditar && <th className="py-2 pr-2"></th>}
             </tr>
           </thead>
@@ -115,7 +116,7 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
               const disponible = p.stock_actual - p.stock_reservado;
               const margen = p.precio_lista > 0 ? ((p.precio_lista - p.costo_unitario) / p.precio_lista) * 100 : 0;
               return (
-                <FilaProducto key={p.id} p={p} disponible={disponible} margen={margen} puedeEditar={puedeEditar}
+                <FilaProducto key={p.id} p={p} disponible={disponible} margen={margen} puedeEditar={puedeEditar} puedeVerCostosEmpresa={puedeVerCostosEmpresa}
                   editando={editando === p.id} onEditar={() => setEditando(p.id)} onCerrarEdicion={() => { setEditando(null); router.refresh(); }}
                   entradaAbierta={entradaPara === p.id} onEntrada={() => setEntradaPara(p.id)} onCerrarEntrada={() => { setEntradaPara(null); router.refresh(); }}
                   reservasAbiertas={reservasAbiertas === p.id}
@@ -131,10 +132,10 @@ export default function InventarioClient({ productos, puedeEditar }: { productos
 }
 
 function FilaProducto({
-  p, disponible, margen, puedeEditar, editando, onEditar, onCerrarEdicion, entradaAbierta, onEntrada, onCerrarEntrada,
+  p, disponible, margen, puedeEditar, puedeVerCostosEmpresa, editando, onEditar, onCerrarEdicion, entradaAbierta, onEntrada, onCerrarEntrada,
   reservasAbiertas, onToggleReservas,
 }: {
-  p: Producto; disponible: number; margen: number; puedeEditar: boolean;
+  p: Producto; disponible: number; margen: number; puedeEditar: boolean; puedeVerCostosEmpresa: boolean;
   editando: boolean; onEditar: () => void; onCerrarEdicion: () => void;
   entradaAbierta: boolean; onEntrada: () => void; onCerrarEntrada: () => void;
   reservasAbiertas: boolean; onToggleReservas: () => void;
@@ -146,6 +147,11 @@ function FilaProducto({
   const [unidad, setUnidad] = useState(p.unidad);
   const [descripcion, setDescripcion] = useState(p.descripcion ?? '');
   const [proveedor, setProveedor] = useState(p.proveedor ?? '');
+  // Costos confidenciales (Etapa 8) — solo se editan si puedeVerCostosEmpresa; costo_empresa
+  // no se captura (columna calculada en la base de datos).
+  const [costoImportacion, setCostoImportacion] = useState(p.costo_importacion ?? 0);
+  const [gananciaCostoPct, setGananciaCostoPct] = useState((p.porcentaje_ganancia_costo ?? 0) * 100);
+  const [impuestos, setImpuestos] = useState(p.impuestos ?? 0);
   const [cantEntrada, setCantEntrada] = useState(0);
   const [comentEntrada, setComentEntrada] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -209,6 +215,9 @@ function FilaProducto({
         <td className="py-2 pr-2">{formatQ(p.costo_unitario)}</td>
         <td className="py-2 pr-2">{formatQ(p.precio_lista)}</td>
         <td className="py-2 pr-2 text-slate-500">{margen.toFixed(1)}%</td>
+        {puedeVerCostosEmpresa && (
+          <td className="py-2 pr-2 text-slate-500">{p.costo_empresa != null ? formatQ(p.costo_empresa) : '—'}</td>
+        )}
         {puedeEditar && (
           <td className="py-2 pr-2 whitespace-nowrap">
             <button className="mr-2 text-xs font-semibold text-navy-600 hover:underline" onClick={onEditar}>Editar</button>
@@ -218,7 +227,7 @@ function FilaProducto({
       </tr>
       {reservasAbiertas && (
         <tr className="bg-amber-50">
-          <td colSpan={puedeEditar ? 9 : 8} className="p-3">
+          <td colSpan={8 + (puedeVerCostosEmpresa ? 1 : 0) + (puedeEditar ? 1 : 0)} className="p-3">
             <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-700">Cotizaciones que reservan este producto</p>
             {cargandoReservas && <p className="text-sm text-slate-500">Cargando…</p>}
             {errorReservas && <p className="text-sm text-red-600">{errorReservas}</p>}
@@ -254,7 +263,7 @@ function FilaProducto({
       )}
       {editando && (
         <tr className="bg-slate-50">
-          <td colSpan={9} className="p-3">
+          <td colSpan={8 + (puedeVerCostosEmpresa ? 1 : 0) + (puedeEditar ? 1 : 0)} className="p-3">
             <div className="flex flex-wrap items-end gap-3">
               <div><label className="label">Costo unitario</label><input type="number" step="0.01" className="input w-32" value={costo} onChange={(e) => setCosto(Number(e.target.value))} /></div>
               <div><label className="label">Precio lista</label><input type="number" step="0.01" className="input w-32" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} /></div>
@@ -274,12 +283,29 @@ function FilaProducto({
               </div>
               <div className="min-w-[220px] flex-1"><label className="label">Especificaciones (opcional)</label><input className="input" placeholder="Medidas, material, etc." value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} /></div>
               <div className="min-w-[260px] flex-1"><label className="label">Descripción (opcional)</label><input className="input" placeholder="Texto general/comercial del producto" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></div>
+              {puedeVerCostosEmpresa && (
+                <>
+                  <div className="w-full border-t border-dashed border-slate-300 pt-3">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Costos confidenciales (solo visibles para su rol)</p>
+                  </div>
+                  <div><label className="label">Costo Importación</label><input type="number" step="0.01" className="input w-32" value={costoImportacion} onChange={(e) => setCostoImportacion(Number(e.target.value))} /></div>
+                  <div><label className="label">% ganancia sobre costo</label><input type="number" step="0.1" className="input w-32" value={gananciaCostoPct} onChange={(e) => setGananciaCostoPct(Number(e.target.value))} /></div>
+                  <div><label className="label">Impuestos</label><input type="number" step="0.01" className="input w-32" value={impuestos} onChange={(e) => setImpuestos(Number(e.target.value))} /></div>
+                  <div>
+                    <label className="label">Costo Empresa (calculado)</label>
+                    <p className="input flex items-center bg-slate-100 text-slate-500">{formatQ(costoImportacion * (1 + gananciaCostoPct / 100))}</p>
+                  </div>
+                </>
+              )}
               <button disabled={guardando} className="btn btn-primary" onClick={async () => {
                 setGuardando(true);
                 await actualizarProducto(p.id, {
                   costo_unitario: costo, precio_lista: precio, unidad: unidad.trim() || 'unidad',
                   imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
                   descripcion: descripcion.trim() || null, proveedor: proveedor.trim() || null,
+                  ...(puedeVerCostosEmpresa ? {
+                    costo_importacion: costoImportacion, porcentaje_ganancia_costo: gananciaCostoPct / 100, impuestos,
+                  } : {}),
                 });
                 setGuardando(false);
                 onCerrarEdicion();
@@ -291,7 +317,7 @@ function FilaProducto({
       )}
       {entradaAbierta && (
         <tr className="bg-emerald-50">
-          <td colSpan={9} className="p-3">
+          <td colSpan={8 + (puedeVerCostosEmpresa ? 1 : 0) + (puedeEditar ? 1 : 0)} className="p-3">
             <div className="flex flex-wrap items-end gap-3">
               <div><label className="label">Cantidad que ingresa</label><input type="number" step="1" className="input w-32" value={cantEntrada} onChange={(e) => setCantEntrada(Number(e.target.value))} /></div>
               <div className="flex-1 min-w-[200px]"><label className="label">Comentario / referencia</label><input className="input" value={comentEntrada} onChange={(e) => setComentEntrada(e.target.value)} /></div>
@@ -310,7 +336,7 @@ function FilaProducto({
   );
 }
 
-function NuevoProductoForm({ onClose }: { onClose: () => void }) {
+function NuevoProductoForm({ onClose, puedeVerCostosEmpresa }: { onClose: () => void; puedeVerCostosEmpresa: boolean }) {
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [color, setColor] = useState('');
@@ -322,6 +348,9 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
   const [especificaciones, setEspecificaciones] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [proveedor, setProveedor] = useState('');
+  const [costoImportacion, setCostoImportacion] = useState(0);
+  const [gananciaCostoPct, setGananciaCostoPct] = useState(0);
+  const [impuestos, setImpuestos] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -365,6 +394,16 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
         </div>
         <input className="input" placeholder="Especificaciones (opcional)" value={especificaciones} onChange={(e) => setEspecificaciones(e.target.value)} />
         <input className="input sm:col-span-2" placeholder="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+        {puedeVerCostosEmpresa && (
+          <>
+            <div className="sm:col-span-3 border-t border-dashed border-slate-300 pt-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Costos confidenciales (solo visibles para su rol)</p>
+            </div>
+            <input type="number" step="0.01" className="input" placeholder="Costo Importación" value={costoImportacion} onChange={(e) => setCostoImportacion(Number(e.target.value))} />
+            <input type="number" step="0.1" className="input" placeholder="% ganancia sobre costo" value={gananciaCostoPct} onChange={(e) => setGananciaCostoPct(Number(e.target.value))} />
+            <input type="number" step="0.01" className="input" placeholder="Impuestos" value={impuestos} onChange={(e) => setImpuestos(Number(e.target.value))} />
+          </>
+        )}
       </div>
       <div className="mt-3 flex gap-2">
         <button disabled={guardando} className="btn btn-orange" onClick={async () => {
@@ -374,6 +413,9 @@ function NuevoProductoForm({ onClose }: { onClose: () => void }) {
             codigo, nombre, color_variante: color || null, unidad: unidad.trim() || 'unidad', costo_unitario: costo, precio_lista: precio, stock_actual: stock,
             imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
             descripcion: descripcion.trim() || null, proveedor: proveedor.trim() || null,
+            ...(puedeVerCostosEmpresa ? {
+              costo_importacion: costoImportacion, porcentaje_ganancia_costo: gananciaCostoPct / 100, impuestos,
+            } : {}),
           });
           setGuardando(false);
           if (r?.error) setError(r.error); else onClose();

@@ -4,14 +4,35 @@ import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
+// Campos de costo confidenciales (Etapa 8) — costo_empresa NO se acepta aquí porque es una
+// columna calculada en la base de datos (costo_importacion * (1 + porcentaje_ganancia_costo)).
+interface CamposCostosEmpresa {
+  costo_importacion?: number | null;
+  porcentaje_ganancia_costo?: number | null;
+  impuestos?: number | null;
+}
+
+// Defensa en profundidad: aunque el formulario de Inventario ya oculta estos campos a
+// quien no tiene el permiso, esta función es un server action invocable directamente, así
+// que si alguien sin el permiso los manda de todos modos, se descartan aquí antes de tocar
+// la base de datos — nunca se guardan "a medias" ni se ignora en silencio el intento.
+async function filtrarCamposCostosEmpresa<T extends CamposCostosEmpresa>(
+  patch: T, tienePermiso: boolean
+): Promise<Omit<T, keyof CamposCostosEmpresa>> {
+  if (tienePermiso) return patch;
+  const { costo_importacion, porcentaje_ganancia_costo, impuestos, ...resto } = patch;
+  return resto;
+}
+
 export async function actualizarProducto(id: string, patch: {
   nombre?: string; costo_unitario?: number; precio_lista?: number; stock_actual?: number; stock_minimo?: number; activo?: boolean;
   imagen_url?: string | null; especificaciones?: string | null; unidad?: string;
   descripcion?: string | null; proveedor?: string | null;
-}) {
-  await requireSesion('INVENTARIO_EDITAR');
+} & CamposCostosEmpresa) {
+  const sesion = await requireSesion('INVENTARIO_EDITAR');
   const supabase = createClient();
-  const { error } = await supabase.from('productos').update(patch).eq('id', id);
+  const patchFiltrado = await filtrarCamposCostosEmpresa(patch, sesion.permisos.includes('INVENTARIO_COSTOS_EMPRESA'));
+  const { error } = await supabase.from('productos').update(patchFiltrado).eq('id', id);
   if (error) return { error: error.message };
   revalidatePath('/inventario');
   return { ok: true };
@@ -22,10 +43,11 @@ export async function crearProducto(payload: {
   costo_unitario: number; precio_lista: number; stock_actual: number;
   imagen_url?: string | null; especificaciones?: string | null;
   descripcion?: string | null; proveedor?: string | null;
-}) {
+} & CamposCostosEmpresa) {
   const sesion = await requireSesion('INVENTARIO_EDITAR');
   const supabase = createClient();
-  const { error } = await supabase.from('productos').insert(payload);
+  const payloadFiltrado = await filtrarCamposCostosEmpresa(payload, sesion.permisos.includes('INVENTARIO_COSTOS_EMPRESA'));
+  const { error } = await supabase.from('productos').insert(payloadFiltrado);
   if (error) return { error: error.message };
 
   if (payload.stock_actual > 0) {
