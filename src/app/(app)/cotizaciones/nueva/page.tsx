@@ -22,6 +22,8 @@ export default async function NuevaCotizacionPage() {
   const vendedorInicial = esVendedorFijo
     ? (vendedores ?? []).find((v) => v.id === sesion.vendedorId) ?? null
     : null;
+  // Resumen Fiscal: roles fijos (decisión explícita del cliente, no un permiso configurable).
+  const puedeVerResumenFiscal = sesion.rolCodigo === 'ADMINISTRADOR' || sesion.rolCodigo === 'AUTORIZADOR';
 
   return (
     <div>
@@ -35,6 +37,7 @@ export default async function NuevaCotizacionPage() {
         plantillas={(plantillas ?? []) as PlantillaCotizacion[]}
         esVendedorFijo={esVendedorFijo}
         vendedorInicial={vendedorInicial as Vendedor | null}
+        puedeVerResumenFiscal={puedeVerResumenFiscal}
       />
     </div>
   );

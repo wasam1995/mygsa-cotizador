@@ -18,6 +18,8 @@ export interface LineaPayload {
   modo_precio: ModoPrecioLinea;
   margen_pct: number | null;
   incluir_foto: boolean;
+  precio_venta_empresa: number;
+  incluir_especificaciones: boolean;
 }
 
 export interface CostoOperativoPayload {
@@ -105,6 +107,8 @@ export async function crearCotizacion(payload: CrearCotizacionPayload) {
     modo_precio: l.modo_precio,
     margen_pct: l.margen_pct,
     incluir_foto: l.incluir_foto,
+    precio_venta_empresa: l.precio_venta_empresa,
+    incluir_especificaciones: l.incluir_especificaciones,
   }));
 
   const { error: errDet } = await supabase.from('cotizacion_detalle').insert(filas);
