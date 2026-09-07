@@ -56,6 +56,7 @@ export default function DetalleClient({
   const [mostrarConfirmarEliminar, setMostrarConfirmarEliminar] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState<'cliente' | 'interno' | null>(null);
   const [abriendoPdf, setAbriendoPdf] = useState<'cliente' | 'interno' | null>(null);
+  const [generandoExcel, setGenerandoExcel] = useState<'cliente' | 'interno' | null>(null);
 
   const puedeVerInterno = permisos.includes('COTIZACIONES_CREAR') || permisos.includes('COTIZACIONES_VER_TODAS');
 
@@ -153,6 +154,50 @@ export default function DetalleClient({
     }
   }
 
+  // Descarga el Excel (cliente o interno) generado en el servidor. Antes esto era un
+  // simple <a href="/api/..."> de navegación directa: si el servidor respondía con un
+  // error (500/403/404), el navegador reemplazaba toda la pantalla de la cotización por
+  // la página de error de Next — para el usuario se sentía como "no me deja descargar",
+  // sin ningún mensaje. Con fetch + blob se controla la respuesta: si falla, se muestra
+  // el mensaje de error de arriba y la pantalla no se pierde; si todo sale bien, se
+  // dispara la descarga igual que con los botones de PDF.
+  async function handleDescargarExcel(version: 'cliente' | 'interno') {
+    setError(null);
+    setGenerandoExcel(version);
+    try {
+      const url = version === 'interno'
+        ? `/api/cotizaciones/${cotizacion.id}/excel`
+        : `/api/cotizaciones/${cotizacion.id}/excel/cliente`;
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        let mensaje = 'No se pudo generar el Excel. Intente de nuevo.';
+        try {
+          const cuerpo = await resp.json();
+          if (cuerpo?.error) mensaje = cuerpo.error;
+        } catch {
+          // La respuesta de error no era JSON — se usa el mensaje genérico de arriba.
+        }
+        setError(mensaje);
+        return;
+      }
+      const blob = await resp.blob();
+      const disposicion = resp.headers.get('Content-Disposition') || '';
+      const coincidencia = /filename="([^"]+)"/.exec(disposicion);
+      const base = (cotizacion.numero_sistema_externo || cotizacion.numero_interno || cotizacion.id).replace(/[^a-zA-Z0-9-]/g, '_');
+      const nombreArchivo = coincidencia?.[1] || `cotizacion_${base}${version === 'interno' ? '_INTERNO' : ''}.xlsx`;
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = nombreArchivo;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      setError('No se pudo generar el Excel. Intente de nuevo.');
+    } finally {
+      setGenerandoExcel(null);
+    }
+  }
+
   // Abre el PDF en una pestaña nueva usando el visor nativo del navegador — desde ahí el
   // usuario puede imprimirlo o guardarlo con los controles propios del visor (más
   // confiable entre navegadores que forzar window.print() sobre la página).
@@ -192,9 +237,13 @@ export default function DetalleClient({
               {generandoPdf === 'interno' ? 'Generando…' : '⬇️ PDF interno'}
             </button>
           )}
-          <a href={`/api/cotizaciones/${cotizacion.id}/excel/cliente`} className="btn btn-secondary">⬇️ Excel cliente</a>
+          <button onClick={() => handleDescargarExcel('cliente')} disabled={generandoExcel !== null} className="btn btn-secondary">
+            {generandoExcel === 'cliente' ? 'Generando…' : '⬇️ Excel cliente'}
+          </button>
           {puedeVerInterno && (
-            <a href={`/api/cotizaciones/${cotizacion.id}/excel`} className="btn btn-secondary">⬇️ Excel interno</a>
+            <button onClick={() => handleDescargarExcel('interno')} disabled={generandoExcel !== null} className="btn btn-secondary">
+              {generandoExcel === 'interno' ? 'Generando…' : '⬇️ Excel interno'}
+            </button>
           )}
           {puedeModificarOEliminar && (
             <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">✏️ Modificar</Link>
