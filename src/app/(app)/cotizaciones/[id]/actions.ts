@@ -153,6 +153,8 @@ export async function actualizarCotizacionCompleta(cotizacionId: string, payload
     modo_precio: l.modo_precio,
     margen_pct: l.margen_pct,
     incluir_foto: l.incluir_foto,
+    precio_venta_empresa: l.precio_venta_empresa,
+    incluir_especificaciones: l.incluir_especificaciones,
   }));
   const { error: errDet } = await supabase.from('cotizacion_detalle').insert(filas);
   if (errDet) return { error: errDet.message };
