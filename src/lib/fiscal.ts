@@ -148,9 +148,19 @@ export function buscarEscalaComision(margenPct: number, escalas: EscalaComision[
 
 // Precio de venta a partir de costo + % de margen SOBRE EL PRECIO DE VENTA (no sobre el
 // costo) — misma fórmula que la hoja "Catalogo" del Excel: Precio = Costo / (1 - %Margen).
+// Se conserva solo para poder reabrir/mostrar cotizaciones ya guardadas con el modo
+// COSTO_MARGEN (ver ModoPrecioLinea en types.ts) — el formulario ya no la usa para
+// líneas nuevas, esas usan precioPorAumentoMercado.
 export function precioPorMargen(costoUnitario: number, margenPct: number): number {
   if (margenPct >= 1 || margenPct < 0) return 0;
   return round2(costoUnitario / (1 - margenPct));
+}
+
+// Modo "% aumento precio de mercado" (Etapa 8): el Precio Unit. se calcula aumentando un
+// % sobre el precio FIJO de referencia (precio_venta_empresa, normalmente el precio de
+// lista del catálogo) — nunca sobre el costo. Precio = Precio de Venta Empresa x (1 + %).
+export function precioPorAumentoMercado(precioVentaEmpresa: number, aumentoPct: number): number {
+  return round2(precioVentaEmpresa * (1 + aumentoPct));
 }
 
 // Reparte el total de costos operativos adicionales entre las líneas de productos, en

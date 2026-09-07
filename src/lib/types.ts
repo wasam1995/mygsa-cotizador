@@ -80,6 +80,13 @@ export interface Producto {
   especificaciones: string | null;
   descripcion: string | null;
   proveedor: string | null;
+  // Costos confidenciales (Etapa 8) — solo se leen/editan con el permiso
+  // INVENTARIO_COSTOS_EMPRESA; costo_empresa es una columna calculada en la base de datos
+  // (costo_importacion * (1 + porcentaje_ganancia_costo)).
+  costo_importacion: number | null;
+  porcentaje_ganancia_costo: number | null;
+  costo_empresa: number | null;
+  impuestos: number | null;
 }
 
 export interface ParametrosFiscales {
@@ -198,7 +205,12 @@ export interface Cotizacion {
   plantilla_id: string | null;
 }
 
-export type ModoPrecioLinea = 'FIJO' | 'COSTO_MARGEN';
+// AUMENTO_MERCADO = modo vigente ("% aumento precio de mercado" en el formulario):
+// Precio Unit. = precio_venta_empresa * (1 + margen_pct) — el % se aplica sobre el precio
+// fijo de referencia, nunca sobre el costo. COSTO_MARGEN es el modo anterior (precio =
+// costo_unitario / (1 - margen_pct)); se conserva solo para cotizaciones ya guardadas con
+// ese modo — el formulario ya no lo ofrece para líneas nuevas.
+export type ModoPrecioLinea = 'FIJO' | 'COSTO_MARGEN' | 'AUMENTO_MERCADO';
 
 export interface CotizacionDetalle {
   id: string;
@@ -217,6 +229,11 @@ export interface CotizacionDetalle {
   modo_precio: ModoPrecioLinea;
   margen_pct: number | null;
   incluir_foto: boolean;
+  // Etapa 8: precio base de catálogo (referencia para el modo AUMENTO_MERCADO) y checkbox
+  // para incluir las especificaciones del producto en la cotización de cliente (mismo
+  // patrón que incluir_foto).
+  precio_venta_empresa: number;
+  incluir_especificaciones: boolean;
 }
 
 export interface CotizacionCostoOperativo {
