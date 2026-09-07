@@ -42,7 +42,14 @@ function rangoMerge(colDesde: number, colHasta: number, fila: number) {
  * sistema).
  */
 export function construirHojaCotizacion(ctx: ContextoCotizacion, opciones: { interna: boolean }): XLSX.WorkSheet {
-  const { cotizacion: c, lineas, parametros, plantilla, clienteNombre, clienteNit, clienteDireccion, vendedorNombre, vendedorCorreo } = ctx;
+  const { cotizacion: c, lineas, plantilla, clienteNombre, clienteNit, clienteDireccion, vendedorNombre, vendedorCorreo } = ctx;
+  // Defensivo: en datos reales puede que la fila de parametros_fiscales no llegue (fallo de
+  // red/consulta puntual, fila borrada, etc.) — antes esto tronaba con un TypeError no
+  // controlado apenas se leía `parametros.nombre_comercial`, lo que en el botón de
+  // descarga (un <a href> de navegación directa, no un fetch) se veía como "no me deja
+  // descargar" en vez de un error legible. Con este resguardo la hoja se sigue generando
+  // (con textos genéricos donde falte el dato) en lugar de fallar por completo.
+  const parametros: Partial<ParametrosFiscales> = ctx.parametros ?? {};
   const interna = opciones.interna;
   const mostrarPrecios = interna || c.mostrar_precios_unitarios_cliente;
   const colCount = interna ? 7 : 5; // interna agrega Costo unit. y Utilidad línea
@@ -91,8 +98,8 @@ export function construirHojaCotizacion(ctx: ContextoCotizacion, opciones: { int
   }
 
   // --- Encabezado dual ---
-  agregarDual(parametros.nombre_comercial || parametros.razon_social, 'COTIZACIÓN');
-  agregarDual(parametros.direccion_empresa || '', `Folio: ${c.numero_sistema_externo || c.numero_interno}`);
+  agregarDual(parametros.nombre_comercial || parametros.razon_social || 'Empresa', 'COTIZACIÓN');
+  agregarDual(parametros.direccion_empresa || '', `Folio: ${c.numero_sistema_externo || c.numero_interno || '—'}`);
   agregarDual(`${parametros.telefono_empresa || ''} · ${parametros.correo_empresa || ''}`, `Fecha: ${formatFecha(c.fecha_emision)}`);
   agregarDual('', `Válida hasta: ${c.fecha_vencimiento ? formatFecha(c.fecha_vencimiento) : '—'}`);
   if (interna || c.mostrar_vendedor_cliente) {
@@ -189,9 +196,9 @@ export function construirHojaCotizacion(ctx: ContextoCotizacion, opciones: { int
   if (interna) {
     agregarAncha('RESUMEN FINANCIERO INTERNO (CONFIDENCIAL)');
     agregarMoneda('Venta neta base (sin IVA)', Number(c.base_gravable));
-    agregarMoneda(`IVA (${(Number(parametros.iva_porcentaje) * 100).toFixed(0)}%)`, Number(c.iva_monto));
+    agregarMoneda(`IVA (${(Number(parametros.iva_porcentaje ?? 0.12) * 100).toFixed(0)}%)`, Number(c.iva_monto));
     agregarMoneda('Retención ISR', Number(c.isr_retencion));
-    agregarMoneda(`Retención IVA (${(Number(parametros.retencion_iva_porcentaje) * 100).toFixed(0)}% del IVA, si el cliente es retenedor)`, Number(c.iva_retencion));
+    agregarMoneda(`Retención IVA (${(Number(parametros.retencion_iva_porcentaje ?? 0.15) * 100).toFixed(0)}% del IVA, si el cliente es retenedor)`, Number(c.iva_retencion));
     agregarMoneda('Pago neto que recibe la empresa', Number(c.pago_neto_empresa));
     agregar(vacia());
     agregarMoneda('Costo total de productos/servicios', Number(c.costo_total_productos));
