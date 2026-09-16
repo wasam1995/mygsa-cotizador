@@ -83,21 +83,22 @@ export async function actualizarPermisosRol(rolId: string, permisoCodigos: strin
   await requireSesion('USUARIOS_ADMINISTRAR');
   const supabase = createClient();
 
-  // Antes esta función no revisaba el resultado de ninguna de las dos operaciones, así
-  // que un error (por ejemplo de permisos o de conexión) se tragaba en silencio y la
-  // pantalla igual mostraba "Permisos actualizados." aunque no se hubiera guardado nada.
-  const { error: errDelete } = await supabase.from('roles_permisos').delete().eq('rol_id', rolId);
-  if (errDelete) return { error: `No se pudieron actualizar los permisos: ${errDelete.message}` };
+  // Causa real del bug de "se me fueron todos los permisos de Administrador": esto hacía
+  // DELETE de todos los permisos del rol y luego INSERT del set nuevo como dos llamadas
+  // separadas. La política RLS de roles_permisos exige tener USUARIOS_ADMINISTRAR tanto
+  // para borrar como para insertar — si la persona editaba los permisos de SU PROPIO rol y
+  // el cambio incluía soltar USUARIOS_ADMINISTRAR, el DELETE la dejaba sin permisos, y para
+  // cuando corría el INSERT ya no tenía permiso para escribir: Postgres bloqueaba el INSERT
+  // en silencio (RLS no da error, solo 0 filas), y el rol quedaba sin ningún permiso.
+  // Ahora se usa una función de base de datos (SECURITY DEFINER, ver database/21_correccion_
+  // autobloqueo_permisos_rol.sql) que hace el borrado + inserción como una sola transacción
+  // atómica con privilegios propios — nunca puede auto-bloquearse ni quedar a medias.
+  const { error } = await supabase.rpc('actualizar_permisos_rol', {
+    p_rol_id: rolId,
+    p_permiso_codigos: permisoCodigos,
+  });
+  if (error) return { error: `No se pudieron actualizar los permisos: ${error.message}` };
 
-  if (permisoCodigos.length > 0) {
-    const { data: permisos, error: errSel } = await supabase.from('permisos').select('id, codigo').in('codigo', permisoCodigos);
-    if (errSel) return { error: `No se pudieron actualizar los permisos: ${errSel.message}` };
-    const filas = (permisos ?? []).map((p) => ({ rol_id: rolId, permiso_id: p.id }));
-    if (filas.length > 0) {
-      const { error: errIns } = await supabase.from('roles_permisos').insert(filas);
-      if (errIns) return { error: `No se pudieron guardar los permisos: ${errIns.message}` };
-    }
-  }
   revalidatePath('/usuarios');
   return { ok: true };
 }
