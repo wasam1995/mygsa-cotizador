@@ -161,13 +161,19 @@ export function precioPorMargen(costoUnitario: number, margenPct: number): numbe
   return round2(costoUnitario / (1 - margenPct));
 }
 
-// Modo "% aumento precio de mercado" (Etapa 8, corregido): el Precio Unit. (C/IVA) se
-// obtiene dividiendo el precio FIJO de referencia (precio_venta_empresa, normalmente el
-// precio de lista del catálogo) entre (1 + % de aumento) — nunca multiplicando, y nunca
-// sobre el costo. Precio Unit. = Precio de Venta Empresa / (1 + % aumento).
+// Modo "% aumento precio de mercado" (Etapa 8, segunda corrección): el Precio Unit.
+// (C/IVA) se obtiene dividiendo el precio FIJO de referencia (precio_venta_empresa,
+// normalmente el precio de lista del catálogo) entre (1 - % de aumento) — es la MISMA
+// fórmula de margen-sobre-precio que precioPorMargen (arriba) y que costo_empresa en la
+// base de datos, solo que aplicada sobre precio_venta_empresa en vez del costo. Se
+// habían probado antes "* (1 + %)" y luego "/ (1 + %)"; la verificación con la hoja de
+// referencia del cliente (precio_venta_empresa=150.13, 35% -> 230.97) confirmó que es
+// "/ (1 - %)": 150.13 / (1 - 0.35) = 230.97. Con esta fórmula el resultado SÍ sube sobre
+// el precio de referencia (coherente con "aumento"); dividir entre (1 + %) lo bajaba, lo
+// cual nunca tuvo sentido con el nombre del campo.
 export function precioPorAumentoMercado(precioVentaEmpresa: number, aumentoPct: number): number {
-  if (aumentoPct <= -1) return 0;
-  return round2(precioVentaEmpresa / (1 + aumentoPct));
+  if (aumentoPct >= 1 || aumentoPct < 0) return 0;
+  return round2(precioVentaEmpresa / (1 - aumentoPct));
 }
 
 // Reparte el total de costos operativos adicionales entre las líneas de productos, en

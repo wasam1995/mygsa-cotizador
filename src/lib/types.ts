@@ -211,10 +211,12 @@ export interface Cotizacion {
 }
 
 // AUMENTO_MERCADO = modo vigente ("% aumento precio de mercado" en el formulario):
-// Precio Unit. = precio_venta_empresa / (1 + margen_pct) — el % se aplica sobre el precio
-// fijo de referencia, nunca sobre el costo. COSTO_MARGEN es el modo anterior (precio =
-// costo_unitario / (1 - margen_pct)); se conserva solo para cotizaciones ya guardadas con
-// ese modo — el formulario ya no lo ofrece para líneas nuevas.
+// Precio Unit. = precio_venta_empresa / (1 - margen_pct) — misma fórmula de margen sobre
+// precio que COSTO_MARGEN, solo que aplicada sobre precio_venta_empresa en vez del costo.
+// El % se aplica sobre el precio fijo de referencia, nunca sobre el costo. COSTO_MARGEN es
+// el modo anterior (precio = costo_unitario / (1 - margen_pct)); se conserva solo para
+// cotizaciones ya guardadas con ese modo — el formulario ya no lo ofrece para líneas
+// nuevas.
 export type ModoPrecioLinea = 'FIJO' | 'COSTO_MARGEN' | 'AUMENTO_MERCADO';
 
 export interface CotizacionDetalle {
