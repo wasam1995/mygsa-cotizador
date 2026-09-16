@@ -846,36 +846,18 @@ export default function CotizadorForm({
               <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Detalle de determinación de Comisiones</h3>
               <dl className="space-y-1.5 text-sm">
                 <Fila label="Total Cotización (Prospecto)" valor={calculo.totalCotizado} negrita />
+                <Fila label={`(−) IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={-calculo.ivaMonto} tono="text-red-600" />
+                <Fila label="(−) ISR Retención" valor={-calculo.isrRetencion} tono="text-red-600" />
+                <hr className="my-2 border-slate-200" />
+                <Fila label="= Base para Comisiones" valor={calculo.baseParaComisiones} negrita tono="text-navy-700" />
                 <Fila label="(−) Costo total de operación" valor={-calculo.costoTotalOperacion} tono="text-red-600" negrita />
                 <div className="pl-4 text-xs text-slate-500">
                   <Fila label="(+) Costo total de productos/servicios" valor={calculo.costoTotalProductos} />
                   <Fila label="(+) Gastos operativos adicionales" valor={calculo.costosOperativosTotal} />
                 </div>
-                <Fila label="(−) Impuestos" valor={-(calculo.ivaMonto + calculo.isrRetencion)} tono="text-red-600" negrita />
-                <div className="pl-4 text-xs text-slate-500">
-                  <Fila label="Impuesto al Valor Agregado (IVA)" valor={calculo.ivaMonto} />
-                  <Fila label="Impuesto Sobre la Renta (ISR)" valor={calculo.isrRetencion} />
-                </div>
                 <hr className="my-2 border-slate-200" />
                 <Fila label="= Utilidad Neta (Base para comisión)" valor={calculo.utilidadNeta} negrita grande tono="text-navy-700" />
                 <div className="flex justify-between text-sm text-slate-600"><dt>% Margen de utilidad (neta)</dt><dd className="font-semibold">{(calculo.margenUtilidadPct * 100).toFixed(2)}%</dd></div>
-
-                {/* Tabla aparte que explica cómo se llegó a ese % de margen y a la escala
-                    aplicada — separada del desglose numérico de arriba, como se pidió. */}
-                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
-                  <p className="mb-1 font-semibold text-slate-700">¿Por qué se calcula así?</p>
-                  <p>
-                    La comisión del vendedor se paga sobre la <b>Utilidad Neta</b>, no sobre el total cotizado —
-                    así la comisión nunca se calcula sobre dinero que en realidad se va en costos, gastos operativos
-                    o impuestos.
-                  </p>
-                  <p className="mt-1.5"><b>Fórmula:</b> Utilidad Neta = Total Cotización − Costo total de operación − Impuestos (IVA + ISR).</p>
-                  <p className="mt-1.5"><b>Campos que se usan:</b> Total Cotización (con IVA), Costo total de productos/servicios, Gastos operativos adicionales, IVA, Retención ISR.</p>
-                  <p className="mt-1.5">
-                    Con los valores de esta cotización: {formatQ(calculo.totalCotizado)} − {formatQ(calculo.costoTotalOperacion)} − ({formatQ(calculo.ivaMonto)} + {formatQ(calculo.isrRetencion)}) = <b>{formatQ(calculo.utilidadNeta)}</b>,
-                    que representa el <b>{(calculo.margenUtilidadPct * 100).toFixed(2)}%</b> de la venta neta base (sin IVA). Ese % decide en qué <b>escala de comisión</b> (Parámetros) cae la cotización.
-                  </p>
-                </div>
 
                 <div className="mt-2 flex justify-between text-sm text-slate-600">
                   <dt>Escala de comisión aplicada</dt>
