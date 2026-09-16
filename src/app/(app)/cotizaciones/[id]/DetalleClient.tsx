@@ -9,7 +9,7 @@ import PdfPreview from '@/components/PdfPreview';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
 import { distribuirCostosOperativosPorLinea } from '@/lib/fiscal';
-import { cambiarEstado, eliminarCotizacion, subirPdfCotizacion, obtenerUrlAdjunto } from './actions';
+import { cambiarEstado, eliminarCotizacion, subirPdfCotizacion, obtenerUrlAdjunto, recalcularCotizacion } from './actions';
 import type { Cotizacion, CotizacionAdjunto, CotizacionCostoOperativo, CotizacionDetalle, CotizacionHistorialEstado, MovimientoInventario, ParametrosFiscales, PlantillaCotizacion } from '@/lib/types';
 
 type Tab = 'interno' | 'impresion';
@@ -57,8 +57,22 @@ export default function DetalleClient({
   const [generandoPdf, setGenerandoPdf] = useState<'cliente' | 'interno' | null>(null);
   const [abriendoPdf, setAbriendoPdf] = useState<'cliente' | 'interno' | null>(null);
   const [generandoExcel, setGenerandoExcel] = useState<'cliente' | 'interno' | null>(null);
+  const [recalculando, setRecalculando] = useState(false);
 
   const puedeVerInterno = permisos.includes('COTIZACIONES_CREAR') || permisos.includes('COTIZACIONES_VER_TODAS');
+
+  // "Recalcular con parámetros actuales" (Etapa 8, corrección): las cifras de Utilidad y
+  // comisión NO se recalculan solas cuando se edita algo en Parámetros (IVA, ISR, escala
+  // de comisiones) — solo se vuelven a calcular cuando la cotización misma se guarda. Este
+  // botón, disponible solo mientras está en Prospecto, aplica los parámetros vigentes sin
+  // tener que volver a guardar cada línea a mano.
+  async function handleRecalcular() {
+    setError(null);
+    setRecalculando(true);
+    const r = await recalcularCotizacion(cotizacion.id);
+    setRecalculando(false);
+    if (r?.error) setError(r.error); else router.refresh();
+  }
 
   // Reparto de los costos operativos adicionales entre las líneas de producto, en
   // proporción a su venta — solo se muestra si la cotización se guardó con la opción de
@@ -426,6 +440,20 @@ export default function DetalleClient({
             </div>
           )}
 
+          {cotizacion.estado === 'PROSPECTO' && puedeGestionar && (
+            <div className="card border-sky-200 bg-sky-50 no-print">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-sky-800">
+                  Las cifras de abajo se calcularon con los Parámetros/Escala de comisiones vigentes cuando se guardó
+                  esta cotización — si después cambiaron, recalcule para aplicar los valores actuales.
+                </p>
+                <button disabled={recalculando} className="btn btn-secondary whitespace-nowrap" onClick={handleRecalcular}>
+                  {recalculando ? 'Recalculando…' : '🔄 Recalcular con parámetros actuales'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <h2 className="mb-2 section-title">Resumen fiscal</h2>
@@ -441,11 +469,17 @@ export default function DetalleClient({
             </div>
             <div>
               <h2 className="mb-2 section-title">Utilidad y comisión (uso interno)</h2>
-              <FilaResumen label="Costo total de productos/servicios" valor={cotizacion.costo_total_productos} />
-              <FilaResumen label="+ Gastos operativos adicionales" valor={cotizacion.costos_operativos_total} />
-              <FilaResumen label="= Costo total de operación" valor={cotizacion.costo_total_operacion} negrita />
-              <FilaResumen label="Utilidad bruta (venta sin IVA - costo)" valor={cotizacion.utilidad_bruta} negrita tono="text-navy-700" />
-              <FilaResumen label="− Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
+              <FilaResumen label="Total cotización (prospecto)" valor={cotizacion.total_cotizado} negrita />
+              <FilaResumen label={`− IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_monto} tono="text-red-600" />
+              <FilaResumen label="− ISR retención" valor={-cotizacion.isr_retencion} tono="text-red-600" />
+              <hr className="my-2" />
+              <FilaResumen label="= Base para comisiones" valor={cotizacion.base_gravable - cotizacion.isr_retencion} negrita tono="text-navy-700" />
+              <FilaResumen label="− Costo total de operación" valor={-cotizacion.costo_total_operacion} tono="text-red-600" negrita />
+              <div className="pl-4 text-xs text-slate-500">
+                <FilaResumen label="(+) Costo total de productos/servicios" valor={cotizacion.costo_total_productos} />
+                <FilaResumen label="(+) Gastos operativos adicionales" valor={cotizacion.costos_operativos_total} />
+              </div>
+              <hr className="my-2" />
               <FilaResumen label="= Utilidad neta (base de comisión)" valor={cotizacion.utilidad_neta} negrita tono="text-navy-700" />
               <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>% Margen de utilidad (neta)</span><span className="font-semibold">{(cotizacion.margen_utilidad_pct * 100).toFixed(2)}%</span></div>
               <div className="flex justify-between py-0.5 text-sm text-slate-600"><span>Escala de comisión aplicada</span><span className="font-semibold">{cotizacion.escala_comision_rango ? `Rango ${cotizacion.escala_comision_rango}` : '—'}</span></div>

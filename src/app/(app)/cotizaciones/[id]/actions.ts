@@ -181,6 +181,37 @@ export async function actualizarCotizacionCompleta(cotizacionId: string, payload
   redirect(`/cotizaciones/${cotizacionId}`);
 }
 
+// "Recalcular con parámetros actuales" (Etapa 8, corrección): el resumen financiero de
+// una cotización (utilidad, comisión, escala aplicada, etc.) NO es un cálculo en vivo al
+// abrir la pantalla — son columnas que quedan guardadas en app.cotizaciones y solo se
+// vuelven a calcular (trigger app.recalcular_cotizacion) cuando la cotización MISMA se
+// crea o se modifica (sus líneas, descuentos, costos operativos). Si después se cambia
+// algo en Parámetros (IVA, ISR, escala de comisiones) una cotización YA guardada se queda
+// con los valores viejos — no porque esté rota, sino porque nada la vuelve a tocar. Esto
+// es intencional para cotizaciones ya autorizadas/facturadas (no deben moverse solas si
+// cambia una tasa después), pero para un PROSPECTO (todavía en borrador) el usuario espera
+// poder aplicarle los parámetros vigentes sin tener que re-guardar cada línea a mano — este
+// botón llama directamente la misma función que usa el sistema internamente.
+export async function recalcularCotizacion(cotizacionId: string) {
+  const sesion = await requireSesion();
+  const supabase = createClient();
+
+  const { data: actual } = await supabase.from('cotizaciones').select('estado').eq('id', cotizacionId).single();
+  if (!actual) return { error: 'La cotización ya no existe.' };
+  if (actual.estado !== 'PROSPECTO') {
+    return { error: 'Solo se puede recalcular mientras la cotización está en estado Prospecto — una vez enviada a autorización, facturada o anulada, sus cifras quedan fijas.' };
+  }
+  if (!sesion.permisos.includes('COTIZACIONES_CREAR') && !sesion.permisos.includes('COTIZACIONES_VER_TODAS')) {
+    return { error: 'No tiene permiso para recalcular esta cotización.' };
+  }
+
+  const { error } = await supabase.rpc('recalcular_cotizacion', { p_cotizacion_id: cotizacionId });
+  if (error) return { error: error.message };
+
+  revalidatePath(`/cotizaciones/${cotizacionId}`);
+  return { ok: true };
+}
+
 // Elimina definitivamente una cotización (no es lo mismo que "Anular": esto borra el
 // registro). El kardex y las comisiones ya generadas por esta cotización NO se borran,
 // solo quedan sin cotización asociada (conservan número, cliente y vendedor).
