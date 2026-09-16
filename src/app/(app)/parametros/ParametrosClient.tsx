@@ -162,7 +162,7 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
       <div className="card">
         <h2 className="mb-1 section-title">Escala de comisiones sobre utilidad bruta</h2>
         <p className="mb-3 text-xs text-slate-400">
-          El % de comisión del vendedor se calcula según en qué rango cae el % de margen de utilidad de cada cotización (utilidad ÷ venta total). Los porcentajes se escriben como fracción (ej. 0.09 = 9%).
+          El % de comisión del vendedor se calcula según en qué rango cae el % de margen de utilidad de cada cotización (utilidad ÷ venta total). Escriba los porcentajes normal (ej. 35 = 35%, 5 = 5%) — igual que en Inventario y en el Cotizador.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
@@ -181,16 +181,16 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
                 <tr key={e.rango} className="border-b border-slate-100 last:border-0">
                   <td className="py-2 pr-2 font-semibold">{e.rango}</td>
                   <td className="py-2 pr-2">
-                    <input type="number" step="0.0001" className="input" value={e.desde_pct}
-                           onChange={(ev) => setEscala(e.rango, { desde_pct: Number(ev.target.value) })} />
+                    <input type="number" step="0.01" className="input" value={round2(e.desde_pct * 100)}
+                           onChange={(ev) => setEscala(e.rango, { desde_pct: Number(ev.target.value) / 100 })} />
                   </td>
                   <td className="py-2 pr-2">
-                    <input type="number" step="0.0001" className="input" value={e.hasta_pct ?? ''} placeholder="En adelante"
-                           onChange={(ev) => setEscala(e.rango, { hasta_pct: ev.target.value === '' ? null : Number(ev.target.value) })} />
+                    <input type="number" step="0.01" className="input" value={e.hasta_pct == null ? '' : round2(e.hasta_pct * 100)} placeholder="En adelante"
+                           onChange={(ev) => setEscala(e.rango, { hasta_pct: ev.target.value === '' ? null : Number(ev.target.value) / 100 })} />
                   </td>
                   <td className="py-2 pr-2">
-                    <input type="number" step="0.0001" className="input" value={e.porcentaje_comision}
-                           onChange={(ev) => setEscala(e.rango, { porcentaje_comision: Number(ev.target.value) })} />
+                    <input type="number" step="0.01" className="input" value={round2(e.porcentaje_comision * 100)}
+                           onChange={(ev) => setEscala(e.rango, { porcentaje_comision: Number(ev.target.value) / 100 })} />
                   </td>
                   <td className="py-2 pr-2">
                     <input className="input" value={e.observacion ?? ''} onChange={(ev) => setEscala(e.rango, { observacion: ev.target.value })} />
@@ -338,3 +338,7 @@ function Campo({ label, hint, full, children }: { label: string; hint?: string; 
     </div>
   );
 }
+
+// Solo para mostrar el % de la escala de comisiones como número entero/decimal normal
+// (35, no 0.35) — el dato en sí sigue siendo fracción, igual que en Inventario.
+function round2(n: number) { return Math.round((n + Number.EPSILON) * 100) / 100; }
