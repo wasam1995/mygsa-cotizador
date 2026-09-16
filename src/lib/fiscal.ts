@@ -42,8 +42,9 @@ export interface ResultadoFiscal {
   costoTotalProductos: number;
   costosOperativosTotal: number;
   costoTotalOperacion: number;
+  baseParaComisiones: number; // Total Cotizado - IVA - ISR (Etapa 8: corrección) = baseGravable - isrRetencion
   utilidadBruta: number; // Venta Neta Base (SIN IVA) - costo de operación
-  utilidadNeta: number; // utilidadBruta - ISR — base real de la comisión (Etapa 5)
+  utilidadNeta: number; // baseParaComisiones - costoTotalOperacion — base real de la comisión (Etapa 5; mismo resultado numérico que antes, solo cambia el orden en que se muestra la resta)
   margenUtilidadPct: number; // fracción, ej 0.4571 — utilidadNeta / baseGravable
   escala: EscalaComision | null;
   comisionEstimadaPct: number; // fracción
@@ -88,15 +89,18 @@ export function calcularCotizacion(
     ? round3(((descuentoLineas + descuentoGlobal) / subtotalBruto) * 100)
     : 0;
 
-  // --- Resumen financiero interno (Etapa 5: nuevo modelo) ----------------------------
-  // Utilidad Bruta = Venta Neta Base SIN IVA (baseGravable) - Costo total de operación.
-  // Utilidad Neta = Utilidad Bruta - ISR (fórmula obligatoria) — es la base real de la
-  // comisión y del % de margen que decide el rango de la escala.
+  // --- Resumen financiero interno (Etapa 8: corrección del orden del panel) ----------
+  // Base para Comisiones = Total Cotización (con IVA) - IVA - ISR = baseGravable - ISR.
+  // Utilidad Neta = Base para Comisiones - Costo total de operación (costo de productos +
+  // gastos operativos adicionales). El resultado final de utilidadNeta es el mismo de
+  // siempre (la resta es conmutativa, solo cambia el orden en que el panel la muestra);
+  // se conserva utilidadBruta por compatibilidad con quien ya la use.
   const costoTotalProductos = round2(lineas.reduce((acc, l) => acc + l.cantidad * l.costo_unitario, 0));
   const costosOperativosTotal = round2(costosOperativos.reduce((acc, c) => acc + c.cantidad * c.dias * c.costo_unitario, 0));
   const costoTotalOperacion = round2(costoTotalProductos + costosOperativosTotal);
+  const baseParaComisiones = round2(baseGravable - isrRetencion);
   const utilidadBruta = round2(baseGravable - costoTotalOperacion);
-  const utilidadNeta = round2(utilidadBruta - isrRetencion);
+  const utilidadNeta = round2(baseParaComisiones - costoTotalOperacion);
   const margenUtilidadPct = baseGravable > 0 ? round4(utilidadNeta / baseGravable) : 0;
 
   const escala = buscarEscalaComision(margenUtilidadPct, escalasComision);
@@ -122,6 +126,7 @@ export function calcularCotizacion(
     costoTotalProductos,
     costosOperativosTotal,
     costoTotalOperacion,
+    baseParaComisiones,
     utilidadBruta,
     utilidadNeta,
     margenUtilidadPct,
@@ -156,11 +161,13 @@ export function precioPorMargen(costoUnitario: number, margenPct: number): numbe
   return round2(costoUnitario / (1 - margenPct));
 }
 
-// Modo "% aumento precio de mercado" (Etapa 8): el Precio Unit. se calcula aumentando un
-// % sobre el precio FIJO de referencia (precio_venta_empresa, normalmente el precio de
-// lista del catálogo) — nunca sobre el costo. Precio = Precio de Venta Empresa x (1 + %).
+// Modo "% aumento precio de mercado" (Etapa 8, corregido): el Precio Unit. (C/IVA) se
+// obtiene dividiendo el precio FIJO de referencia (precio_venta_empresa, normalmente el
+// precio de lista del catálogo) entre (1 + % de aumento) — nunca multiplicando, y nunca
+// sobre el costo. Precio Unit. = Precio de Venta Empresa / (1 + % aumento).
 export function precioPorAumentoMercado(precioVentaEmpresa: number, aumentoPct: number): number {
-  return round2(precioVentaEmpresa * (1 + aumentoPct));
+  if (aumentoPct <= -1) return 0;
+  return round2(precioVentaEmpresa / (1 + aumentoPct));
 }
 
 // Reparte el total de costos operativos adicionales entre las líneas de productos, en

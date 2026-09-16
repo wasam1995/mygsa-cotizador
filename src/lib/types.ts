@@ -81,11 +81,16 @@ export interface Producto {
   descripcion: string | null;
   proveedor: string | null;
   // Costos confidenciales (Etapa 8) — solo se leen/editan con el permiso
-  // INVENTARIO_COSTOS_EMPRESA; costo_empresa es una columna calculada en la base de datos
-  // (costo_importacion * (1 + porcentaje_ganancia_costo)).
+  // INVENTARIO_COSTOS_EMPRESA; costo_empresa y costo_empresa_calculado son columnas
+  // calculadas en la base de datos (ver database/19_etapa8_correccion_formulas_costo_
+  // empresa.sql): costo_empresa = costo_importacion / (1 - porcentaje_ganancia_costo);
+  // costo_empresa_calculado = costo_empresa * (1 + impuestos). costo_empresa se traslada
+  // a costo_unitario y costo_empresa_calculado a precio_lista (el formulario de
+  // Inventario hace esa copia al guardar).
   costo_importacion: number | null;
   porcentaje_ganancia_costo: number | null;
   costo_empresa: number | null;
+  costo_empresa_calculado: number | null;
   impuestos: number | null;
 }
 
@@ -206,7 +211,7 @@ export interface Cotizacion {
 }
 
 // AUMENTO_MERCADO = modo vigente ("% aumento precio de mercado" en el formulario):
-// Precio Unit. = precio_venta_empresa * (1 + margen_pct) — el % se aplica sobre el precio
+// Precio Unit. = precio_venta_empresa / (1 + margen_pct) — el % se aplica sobre el precio
 // fijo de referencia, nunca sobre el costo. COSTO_MARGEN es el modo anterior (precio =
 // costo_unitario / (1 - margen_pct)); se conserva solo para cotizaciones ya guardadas con
 // ese modo — el formulario ya no lo ofrece para líneas nuevas.
