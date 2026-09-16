@@ -157,11 +157,13 @@ export default function PrintQuoteInterno({
           </View>
           <View style={[s.resumen, { backgroundColor: pal.fondoAlterno, marginLeft: 10 }]}>
             <Text style={s.apartadoTitulo}>Utilidad y comisión</Text>
-            <FilaResumen label="Costo total productos/servicios" valor={cotizacion.costo_total_productos} />
-            <FilaResumen label="+ Gastos operativos" valor={cotizacion.costos_operativos_total} />
-            <FilaResumen label="= Costo total operación" valor={cotizacion.costo_total_operacion} negrita />
-            <FilaResumen label="Utilidad bruta (venta sin IVA - costo)" valor={cotizacion.utilidad_bruta} negrita color={pal.primario} />
-            <FilaResumen label="− Retención ISR" valor={-cotizacion.isr_retencion} color="#dc2626" />
+            <FilaResumen label="Total cotización (prospecto)" valor={cotizacion.total_cotizado} negrita />
+            <FilaResumen label={`− IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_monto} color="#dc2626" />
+            <FilaResumen label="− ISR retención" valor={-cotizacion.isr_retencion} color="#dc2626" />
+            <FilaResumen label="= Base para comisiones" valor={cotizacion.base_gravable - cotizacion.isr_retencion} negrita color={pal.primario} />
+            <FilaResumen label="− Costo total de operación" valor={-cotizacion.costo_total_operacion} color="#dc2626" negrita />
+            <FilaResumen label="   (+) Costo total de productos/servicios" valor={cotizacion.costo_total_productos} />
+            <FilaResumen label="   (+) Gastos operativos adicionales" valor={cotizacion.costos_operativos_total} />
             <FilaResumen label="= Utilidad neta (base comisión)" valor={cotizacion.utilidad_neta} negrita color={pal.primario} />
             <View style={s.filaSubtotal}><Text style={s.textoGris}>% Margen (neto)</Text><Text style={s.negrita}>{(cotizacion.margen_utilidad_pct * 100).toFixed(2)}%</Text></View>
             <View style={s.filaSubtotal}><Text style={s.textoGris}>% Comisión vendedor</Text><Text style={s.negrita}>{(cotizacion.comision_estimada_pct * 100).toFixed(2)}%</Text></View>
