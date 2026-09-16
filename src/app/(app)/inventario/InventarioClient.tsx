@@ -6,6 +6,7 @@ import { formatQ } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { actualizarProducto, crearProducto, registrarEntradaInventario, obtenerReservasProducto, recalcularStockInventario } from './actions';
 import type { Producto } from '@/lib/types';
+import { costoEmpresaDesdeImportacion, costoEmpresaCalculadoDesde } from '@/lib/costeoInventario';
 
 type Reserva = { numero: string; estado: string; cliente: string; vendedor: string; cantidad: number };
 
@@ -152,6 +153,14 @@ function FilaProducto({
   const [costoImportacion, setCostoImportacion] = useState(p.costo_importacion ?? 0);
   const [gananciaCostoPct, setGananciaCostoPct] = useState((p.porcentaje_ganancia_costo ?? 0) * 100);
   const [impuestos, setImpuestos] = useState(p.impuestos ?? 0);
+  // Etapa 8 (corrección): mientras se esté capturando Costo Importación, Costo Empresa se
+  // traslada a Costo Unitario y Costo Empresa (Calculado) a Precio Lista — esos dos campos
+  // dejan de ser editables a mano y pasan a calcularse. Si el producto no usa todavía el
+  // costeo confidencial (Costo Importación en 0), Costo Unitario/Precio Lista se mantienen
+  // editables como antes, para no poner en 0 productos que aún no migran a este flujo.
+  const costoEmpresaActivo = puedeVerCostosEmpresa && costoImportacion > 0;
+  const costoEmpresaPreview = costoEmpresaDesdeImportacion(costoImportacion, gananciaCostoPct / 100);
+  const costoEmpresaCalculadoPreview = costoEmpresaCalculadoDesde(costoEmpresaPreview, impuestos);
   const [cantEntrada, setCantEntrada] = useState(0);
   const [comentEntrada, setComentEntrada] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -265,8 +274,18 @@ function FilaProducto({
         <tr className="bg-slate-50">
           <td colSpan={8 + (puedeVerCostosEmpresa ? 1 : 0) + (puedeEditar ? 1 : 0)} className="p-3">
             <div className="flex flex-wrap items-end gap-3">
-              <div><label className="label">Costo unitario</label><input type="number" step="0.01" className="input w-32" value={costo} onChange={(e) => setCosto(Number(e.target.value))} /></div>
-              <div><label className="label">Precio lista</label><input type="number" step="0.01" className="input w-32" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} /></div>
+              <div>
+                <label className="label">Costo unitario</label>
+                <input type="number" step="0.01" className="input w-32" value={costoEmpresaActivo ? costoEmpresaPreview : costo}
+                  disabled={costoEmpresaActivo} onChange={(e) => setCosto(Number(e.target.value))} />
+                {costoEmpresaActivo && <p className="mt-0.5 text-xs text-slate-400">= Costo Empresa (automático)</p>}
+              </div>
+              <div>
+                <label className="label">Precio lista</label>
+                <input type="number" step="0.01" className="input w-32" value={costoEmpresaActivo ? costoEmpresaCalculadoPreview : precio}
+                  disabled={costoEmpresaActivo} onChange={(e) => setPrecio(Number(e.target.value))} />
+                {costoEmpresaActivo && <p className="mt-0.5 text-xs text-slate-400">= Costo Empresa (Calculado) (automático)</p>}
+              </div>
               <div><label className="label">Unidad de medida</label><input className="input w-32" placeholder="unidad, m2, kg…" value={unidad} onChange={(e) => setUnidad(e.target.value)} /></div>
               <div className="min-w-[220px] flex-1"><label className="label">Proveedor (opcional)</label><input className="input" value={proveedor} onChange={(e) => setProveedor(e.target.value)} /></div>
               <div className="min-w-[260px] flex-1">
@@ -290,17 +309,27 @@ function FilaProducto({
                   </div>
                   <div><label className="label">Costo Importación</label><input type="number" step="0.01" className="input w-32" value={costoImportacion} onChange={(e) => setCostoImportacion(Number(e.target.value))} /></div>
                   <div><label className="label">% ganancia sobre costo</label><input type="number" step="0.1" className="input w-32" value={gananciaCostoPct} onChange={(e) => setGananciaCostoPct(Number(e.target.value))} /></div>
-                  <div><label className="label">Impuestos</label><input type="number" step="0.01" className="input w-32" value={impuestos} onChange={(e) => setImpuestos(Number(e.target.value))} /></div>
                   <div>
-                    <label className="label">Costo Empresa (calculado)</label>
-                    <p className="input flex items-center bg-slate-100 text-slate-500">{formatQ(costoImportacion * (1 + gananciaCostoPct / 100))}</p>
+                    <label className="label">Impuestos</label>
+                    <input type="number" step="0.01" className="input w-32" value={impuestos} onChange={(e) => setImpuestos(Number(e.target.value))} />
+                    <p className="mt-0.5 text-xs text-slate-400">Fracción, ej. 0.12 = 12%</p>
+                  </div>
+                  <div>
+                    <label className="label">Costo Empresa</label>
+                    <p className="input flex items-center bg-slate-100 text-slate-500">{formatQ(costoEmpresaPreview)}</p>
+                  </div>
+                  <div>
+                    <label className="label">Costo Empresa (Calculado)</label>
+                    <p className="input flex items-center bg-slate-100 text-slate-500">{formatQ(costoEmpresaCalculadoPreview)}</p>
                   </div>
                 </>
               )}
               <button disabled={guardando} className="btn btn-primary" onClick={async () => {
                 setGuardando(true);
                 await actualizarProducto(p.id, {
-                  costo_unitario: costo, precio_lista: precio, unidad: unidad.trim() || 'unidad',
+                  costo_unitario: costoEmpresaActivo ? costoEmpresaPreview : costo,
+                  precio_lista: costoEmpresaActivo ? costoEmpresaCalculadoPreview : precio,
+                  unidad: unidad.trim() || 'unidad',
                   imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
                   descripcion: descripcion.trim() || null, proveedor: proveedor.trim() || null,
                   ...(puedeVerCostosEmpresa ? {
@@ -351,6 +380,11 @@ function NuevoProductoForm({ onClose, puedeVerCostosEmpresa }: { onClose: () => 
   const [costoImportacion, setCostoImportacion] = useState(0);
   const [gananciaCostoPct, setGananciaCostoPct] = useState(0);
   const [impuestos, setImpuestos] = useState(0);
+  // Etapa 8 (corrección): mismo criterio que en FilaProducto — con Costo Importación
+  // capturado, Costo Empresa/Costo Empresa (Calculado) reemplazan a Costo/Precio lista.
+  const costoEmpresaActivo = puedeVerCostosEmpresa && costoImportacion > 0;
+  const costoEmpresaPreview = costoEmpresaDesdeImportacion(costoImportacion, gananciaCostoPct / 100);
+  const costoEmpresaCalculadoPreview = costoEmpresaCalculadoDesde(costoEmpresaPreview, impuestos);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -378,8 +412,16 @@ function NuevoProductoForm({ onClose, puedeVerCostosEmpresa }: { onClose: () => 
         <input className="input sm:col-span-2" placeholder="Nombre del producto" value={nombre} onChange={(e) => setNombre(e.target.value)} />
         <input className="input" placeholder="Color / variante (opcional)" value={color} onChange={(e) => setColor(e.target.value)} />
         <input className="input" placeholder="Unidad de medida (unidad, m2, kg…)" value={unidad} onChange={(e) => setUnidad(e.target.value)} />
-        <input type="number" step="0.01" className="input" placeholder="Costo" value={costo} onChange={(e) => setCosto(Number(e.target.value))} />
-        <input type="number" step="0.01" className="input" placeholder="Precio lista" value={precio} onChange={(e) => setPrecio(Number(e.target.value))} />
+        <div>
+          <input type="number" step="0.01" className="input" placeholder="Costo" value={costoEmpresaActivo ? costoEmpresaPreview : costo}
+            disabled={costoEmpresaActivo} onChange={(e) => setCosto(Number(e.target.value))} />
+          {costoEmpresaActivo && <p className="mt-0.5 text-xs text-slate-400">= Costo Empresa (automático)</p>}
+        </div>
+        <div>
+          <input type="number" step="0.01" className="input" placeholder="Precio lista" value={costoEmpresaActivo ? costoEmpresaCalculadoPreview : precio}
+            disabled={costoEmpresaActivo} onChange={(e) => setPrecio(Number(e.target.value))} />
+          {costoEmpresaActivo && <p className="mt-0.5 text-xs text-slate-400">= Costo Empresa (Calculado) (automático)</p>}
+        </div>
         <input type="number" step="1" className="input" placeholder="Stock inicial" value={stock} onChange={(e) => setStock(Number(e.target.value))} />
         <input className="input" placeholder="Proveedor (opcional)" value={proveedor} onChange={(e) => setProveedor(e.target.value)} />
         <div className="sm:col-span-2">
@@ -401,7 +443,16 @@ function NuevoProductoForm({ onClose, puedeVerCostosEmpresa }: { onClose: () => 
             </div>
             <input type="number" step="0.01" className="input" placeholder="Costo Importación" value={costoImportacion} onChange={(e) => setCostoImportacion(Number(e.target.value))} />
             <input type="number" step="0.1" className="input" placeholder="% ganancia sobre costo" value={gananciaCostoPct} onChange={(e) => setGananciaCostoPct(Number(e.target.value))} />
-            <input type="number" step="0.01" className="input" placeholder="Impuestos" value={impuestos} onChange={(e) => setImpuestos(Number(e.target.value))} />
+            <div>
+              <input type="number" step="0.01" className="input" placeholder="Impuestos" value={impuestos} onChange={(e) => setImpuestos(Number(e.target.value))} />
+              <p className="mt-0.5 text-xs text-slate-400">Fracción, ej. 0.12 = 12%</p>
+            </div>
+            {costoEmpresaActivo && (
+              <>
+                <p className="input flex items-center bg-slate-100 text-slate-500">Costo Empresa: {formatQ(costoEmpresaPreview)}</p>
+                <p className="input flex items-center bg-slate-100 text-slate-500">Costo Empresa (Calculado): {formatQ(costoEmpresaCalculadoPreview)}</p>
+              </>
+            )}
           </>
         )}
       </div>
@@ -410,7 +461,10 @@ function NuevoProductoForm({ onClose, puedeVerCostosEmpresa }: { onClose: () => 
           if (!codigo || !nombre) { setError('Código y nombre son obligatorios.'); return; }
           setGuardando(true);
           const r = await crearProducto({
-            codigo, nombre, color_variante: color || null, unidad: unidad.trim() || 'unidad', costo_unitario: costo, precio_lista: precio, stock_actual: stock,
+            codigo, nombre, color_variante: color || null, unidad: unidad.trim() || 'unidad',
+            costo_unitario: costoEmpresaActivo ? costoEmpresaPreview : costo,
+            precio_lista: costoEmpresaActivo ? costoEmpresaCalculadoPreview : precio,
+            stock_actual: stock,
             imagen_url: imagenUrl.trim() || null, especificaciones: especificaciones.trim() || null,
             descripcion: descripcion.trim() || null, proveedor: proveedor.trim() || null,
             ...(puedeVerCostosEmpresa ? {

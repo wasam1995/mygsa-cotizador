@@ -4,8 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 import { requireSesion } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
-// Campos de costo confidenciales (Etapa 8) — costo_empresa NO se acepta aquí porque es una
-// columna calculada en la base de datos (costo_importacion * (1 + porcentaje_ganancia_costo)).
+// Campos de costo confidenciales (Etapa 8) — costo_empresa y costo_empresa_calculado NO se
+// aceptan aquí porque son columnas calculadas en la base de datos (ver database/19_etapa8_
+// correccion_formulas_costo_empresa.sql). Lo que sí llega en el patch/payload normal
+// (costo_unitario, precio_lista) es la copia de esos dos valores que hace el formulario de
+// Inventario al guardar ("Costo Empresa se traslada a Costo Unitario y Costo Empresa
+// (Calculado) a Precio Lista").
 interface CamposCostosEmpresa {
   costo_importacion?: number | null;
   porcentaje_ganancia_costo?: number | null;
