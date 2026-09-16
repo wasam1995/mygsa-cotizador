@@ -201,10 +201,11 @@ export function construirHojaCotizacion(ctx: ContextoCotizacion, opciones: { int
     agregarMoneda(`Retención IVA (${(Number(parametros.retencion_iva_porcentaje ?? 0.15) * 100).toFixed(0)}% del IVA, si el cliente es retenedor)`, Number(c.iva_retencion));
     agregarMoneda('Pago neto que recibe la empresa', Number(c.pago_neto_empresa));
     agregar(vacia());
+    agregarMoneda('Base para comisiones (total cotización - IVA - ISR)', Number(c.base_gravable) - Number(c.isr_retencion));
     agregarMoneda('Costo total de productos/servicios', Number(c.costo_total_productos));
     agregarMoneda('Gastos operativos adicionales', Number(c.costos_operativos_total));
-    agregarMoneda('Utilidad bruta (venta neta base - costos)', Number(c.utilidad_bruta));
-    agregarMoneda('Utilidad neta (utilidad bruta - ISR — base de comisión)', Number(c.utilidad_neta));
+    agregarMoneda('Costo total de operación', Number(c.costo_total_operacion));
+    agregarMoneda('Utilidad neta (base para comisión)', Number(c.utilidad_neta));
     agregarMoneda('% Margen de utilidad neta', Number(c.margen_utilidad_pct), FORMATO_PORCENTAJE);
     agregarMoneda(`Comisión estimada (Rango ${c.escala_comision_rango ?? '—'})`, Number(c.comision_estimada_monto));
     agregarMoneda('Ganancia neta para la empresa', Number(c.ganancia_neta_estimada));
