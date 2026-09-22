@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { Download } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import { formatQ, formatPct } from '@/lib/utils';
 import { obtenerCostosPorPeriodo, rangoMesActual, type AgruparCostosPor } from '@/lib/reportes';
@@ -33,8 +34,8 @@ export default async function ReporteCostos({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end gap-2">
-        <a href={`/api/reportes/costos-periodo/csv?${paramsExport}`} className="btn btn-secondary">⬇️ Exportar CSV</a>
-        <a href={`/api/reportes/costos-periodo/excel?${paramsExport}`} className="btn btn-secondary">⬇️ Exportar Excel</a>
+        <a href={`/api/reportes/costos-periodo/csv?${paramsExport}`} className="btn btn-secondary"><Download className="h-4 w-4" strokeWidth={1.75} />Exportar CSV</a>
+        <a href={`/api/reportes/costos-periodo/excel?${paramsExport}`} className="btn btn-secondary"><Download className="h-4 w-4" strokeWidth={1.75} />Exportar Excel</a>
       </div>
 
       <form className="card flex flex-wrap items-end gap-3">

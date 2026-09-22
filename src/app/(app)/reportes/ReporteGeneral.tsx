@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { Download } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import StatCard from '@/components/StatCard';
 import { formatQ, formatFecha } from '@/lib/utils';
@@ -38,10 +39,12 @@ export default async function ReporteGeneral({
     <div className="space-y-4">
       <div className="flex items-center justify-end gap-2">
         <a href={`/api/reportes/csv?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
-          ⬇️ Exportar CSV
+          <Download className="h-4 w-4" strokeWidth={1.75} />
+          Exportar CSV
         </a>
         <a href={`/api/reportes/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
-          ⬇️ Exportar Excel
+          <Download className="h-4 w-4" strokeWidth={1.75} />
+          Exportar Excel
         </a>
       </div>
 
