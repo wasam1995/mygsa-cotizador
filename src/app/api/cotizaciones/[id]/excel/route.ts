@@ -15,17 +15,29 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!sesion.permisos.includes('COTIZACIONES_CREAR') && !sesion.permisos.includes('COTIZACIONES_VER_TODAS')) {
     return NextResponse.json({ error: 'No tiene permiso para ver la versión interna de esta cotización.' }, { status: 403 });
   }
+  // El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+  // Administrador — decisión explícita del cliente, no un permiso configurable, igual
+  // que en pantalla y en el PDF interno. Quien no cumpla esto (ej. un vendedor con
+  // COTIZACIONES_CREAR) igual puede descargar el Excel interno, pero sin ese bloque.
+  const puedeVerResumenFiscal = sesion.rolCodigo === 'ADMINISTRADOR' || sesion.rolCodigo === 'AUTORIZADOR';
   const supabase = createClient();
 
-  const { data: cotizacion } = await supabase
+  // Todo el cuerpo va en try/catch — ver la nota equivalente en excel/cliente/route.ts:
+  // un tropiezo puntual (fila de parametros_fiscales que no llega, error transitorio) no
+  // debe tronar con una excepción no controlada; se responde con JSON de error legible.
+  try {
+  const { data: cotizacion, error: errorCotizacion } = await supabase
     .from('cotizaciones')
     .select('*, cliente:clientes(nombre_razon, nit, direccion), vendedor:vendedores(nombre_completo, codigo, correo)')
     .eq('id', params.id)
     .single();
 
-  if (!cotizacion) return NextResponse.json({ error: 'No encontrada' }, { status: 404 });
+  if (errorCotizacion || !cotizacion) {
+    if (errorCotizacion) console.error('[excel/interno] error al leer cotización', params.id, errorCotizacion);
+    return NextResponse.json({ error: 'No encontrada' }, { status: 404 });
+  }
 
-  const [{ data: lineas }, { data: costosOperativos }, { data: parametros }, { data: plantilla }] = await Promise.all([
+  const [{ data: lineas }, { data: costosOperativos }, { data: parametros, error: errorParametros }, { data: plantilla }] = await Promise.all([
     supabase.from('cotizacion_detalle').select('*, producto:productos(unidad)').eq('cotizacion_id', params.id).order('linea'),
     supabase.from('cotizacion_costos_operativos').select('*').eq('cotizacion_id', params.id).order('orden'),
     supabase.from('parametros_fiscales').select('*').eq('id', 1).single(),
@@ -33,6 +45,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       ? supabase.from('plantillas_cotizacion').select('*').eq('id', (cotizacion as any).plantilla_id).single()
       : Promise.resolve({ data: null }),
   ]);
+  if (errorParametros) console.error('[excel/interno] error al leer parametros_fiscales', errorParametros);
 
   const c = cotizacion as any;
   const esRetenedor = c.cliente_es_retenedor_iva ? 'Sí' : 'No';
@@ -101,40 +114,70 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   // --- Hoja "Resumen": texto/número simple para la mayoría de filas; las filas
   // calculadas (Retención IVA condicional, Costo total de operación, Utilidad bruta,
-  // Utilidad neta, % margen, Comisión, Ganancia neta) llevan fórmulas reales que se
-  // agregan más abajo, referenciando la celda B8 ("Cliente retenedor de IVA: Sí/No")
-  // como ejemplo de cálculo condicional de impuestos. Modelo financiero Etapa 5:
-  // Utilidad Bruta = Venta Neta Base (sin IVA) - Costo de operación; Utilidad Neta =
-  // Utilidad Bruta - ISR (base real de la comisión).
-  const resumenFilas: { campo: string; valor: unknown }[] = [
-    { campo: 'No. Interno', valor: c.numero_interno },
-    { campo: 'No. ERP', valor: c.numero_sistema_externo ?? '' },
-    { campo: 'Fecha emisión', valor: c.fecha_emision },
-    { campo: 'Estado', valor: c.estado },
-    { campo: 'Cliente', valor: c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '' },
-    { campo: 'Vendedor', valor: c.vendedor?.nombre_completo ?? '' },
-    { campo: 'Cliente retenedor de IVA', valor: esRetenedor }, // fila 8
-    { campo: '% Retención de IVA (parametrizado)', valor: retencionIvaPct }, // fila 9
-    { campo: 'Subtotal (con IVA)', valor: Number(c.subtotal) }, // fila 10
-    { campo: 'Descuentos', valor: Number(c.total_descuentos) }, // fila 11
-    { campo: 'Venta neta base (sin IVA)', valor: Number(c.base_gravable) }, // fila 12
-    { campo: `IVA (${(Number((parametros as any)?.iva_porcentaje ?? 0.12) * 100).toFixed(0)}%)`, valor: Number(c.iva_monto) }, // fila 13
-    { campo: 'Total cotizado (con IVA)', valor: Number(c.total_cotizado) }, // fila 14
-    { campo: 'Retención ISR', valor: Number(c.isr_retencion) }, // fila 15
-    { campo: 'Retención IVA (calculada)', valor: 0 }, // fila 16 — se reemplaza por fórmula
-    { campo: 'Pago neto a la empresa (calculado)', valor: 0 }, // fila 17 — fórmula
-    { campo: '— Uso interno —', valor: '' }, // fila 18
-    { campo: 'Costo total de productos/servicios', valor: Number(c.costo_total_productos) }, // fila 19
-    { campo: 'Gastos operativos adicionales', valor: Number(c.costos_operativos_total) }, // fila 20
-    { campo: 'Costo total de operación (calculado)', valor: 0 }, // fila 21 — fórmula
-    { campo: 'Utilidad bruta (calculada)', valor: 0 }, // fila 22 — fórmula
-    { campo: 'Utilidad neta (calculada, base de comisión)', valor: 0 }, // fila 23 — fórmula
-    { campo: '% Margen de utilidad neta (calculado)', valor: 0 }, // fila 24 — fórmula
-    { campo: 'Escala de comisión aplicada', valor: c.escala_comision_rango ? `Rango ${c.escala_comision_rango}` : '' }, // fila 25
-    { campo: '% Comisión al vendedor', valor: Number(c.comision_estimada_pct) }, // fila 26
-    { campo: 'Comisión estimada/pagada (calculada)', valor: 0 }, // fila 27 — fórmula
-    { campo: 'Ganancia neta para la empresa (calculada)', valor: 0 }, // fila 28 — fórmula
-  ];
+  // Utilidad neta, % margen, Comisión, Ganancia neta) llevan fórmulas reales. Modelo
+  // financiero Etapa 5: Utilidad Bruta = Venta Neta Base (sin IVA) - Costo de operación;
+  // Utilidad Neta = Utilidad Bruta - ISR (base real de la comisión).
+  //
+  // El Resumen Fiscal (retenedor de IVA, subtotal, descuentos, venta neta base, IVA,
+  // total cotizado, retención ISR, retención IVA, pago neto) solo lo ven Autorizador y
+  // Administrador — mismo criterio que en pantalla y en el PDF/hoja "Cotización"
+  // interna. Por eso las filas se arman dinámicamente (en vez de con números de fila
+  // fijos como antes) y ese bloque se omite por completo si no corresponde; las
+  // fórmulas de Utilidad/Comisión (que sí ven todos) usan directamente los valores
+  // numéricos de venta neta base e ISR cuando el bloque fiscal no está presente, para
+  // no depender de celdas que no existen en ese caso.
+  type FilaResumenXlsx = { campo: string; valor?: unknown; formula?: string; formato?: string };
+  const filasResumen: FilaResumenXlsx[] = [];
+  function fila(campo: string, valor: unknown, formato?: string): number {
+    filasResumen.push({ campo, valor, formato });
+    return filasResumen.length + 1; // +1: la fila 1 de la hoja es el encabezado
+  }
+  function filaFormula(campo: string, f: string, formato: string): number {
+    filasResumen.push({ campo, valor: 0, formula: f, formato });
+    return filasResumen.length + 1;
+  }
+
+  fila('No. Interno', c.numero_interno);
+  fila('No. ERP', c.numero_sistema_externo ?? '');
+  fila('Fecha emisión', c.fecha_emision);
+  fila('Estado', c.estado);
+  fila('Cliente', c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '');
+  fila('Vendedor', c.vendedor?.nombre_completo ?? '');
+
+  let filaVentaNetaRef: string;
+  let filaIsrRef: string;
+  if (puedeVerResumenFiscal) {
+    const filaRetenedor = fila('Cliente retenedor de IVA', esRetenedor);
+    const filaPctRetIva = fila('% Retención de IVA (parametrizado)', retencionIvaPct, FORMATO_PORCENTAJE);
+    fila('Subtotal (con IVA)', Number(c.subtotal), FORMATO_MONEDA);
+    fila('Descuentos', Number(c.total_descuentos), FORMATO_MONEDA);
+    const filaVentaNeta = fila('Venta neta base (sin IVA)', Number(c.base_gravable), FORMATO_MONEDA);
+    const filaIva = fila(`IVA (${(Number((parametros as any)?.iva_porcentaje ?? 0.12) * 100).toFixed(0)}%)`, Number(c.iva_monto), FORMATO_MONEDA);
+    const filaTotalCot = fila('Total cotizado (con IVA)', Number(c.total_cotizado), FORMATO_MONEDA);
+    const filaIsr = fila('Retención ISR', Number(c.isr_retencion), FORMATO_MONEDA);
+    const filaIvaRetCalc = filaFormula('Retención IVA (calculada)', `IF(B${filaRetenedor}="Sí",B${filaIva}*B${filaPctRetIva},0)`, FORMATO_MONEDA);
+    filaFormula('Pago neto a la empresa (calculado)', `B${filaTotalCot}-B${filaIsr}-B${filaIvaRetCalc}`, FORMATO_MONEDA);
+    fila('', '');
+    filaVentaNetaRef = `B${filaVentaNeta}`;
+    filaIsrRef = `B${filaIsr}`;
+  } else {
+    fila('Resumen fiscal', 'Disponible solo para Autorizador/Administrador');
+    fila('', '');
+    filaVentaNetaRef = `${Number(c.base_gravable)}`;
+    filaIsrRef = `${Number(c.isr_retencion)}`;
+  }
+
+  fila('— Uso interno (utilidad y comisión) —', '');
+  const filaCostoProd = fila('Costo total de productos/servicios', Number(c.costo_total_productos), FORMATO_MONEDA);
+  const filaGastosOp = fila('Gastos operativos adicionales', Number(c.costos_operativos_total), FORMATO_MONEDA);
+  const filaCostoOper = filaFormula('Costo total de operación (calculado)', `B${filaCostoProd}+B${filaGastosOp}`, FORMATO_MONEDA);
+  const filaUtilBruta = filaFormula('Utilidad bruta (calculada)', `${filaVentaNetaRef}-B${filaCostoOper}`, FORMATO_MONEDA);
+  const filaUtilNeta = filaFormula('Utilidad neta (calculada, base de comisión)', `B${filaUtilBruta}-${filaIsrRef}`, FORMATO_MONEDA);
+  filaFormula('% Margen de utilidad neta (calculado)', `IF(${filaVentaNetaRef}=0,0,B${filaUtilNeta}/${filaVentaNetaRef})`, FORMATO_PORCENTAJE);
+  fila('Escala de comisión aplicada', c.escala_comision_rango ? `Rango ${c.escala_comision_rango}` : '');
+  const filaPctCom = fila('% Comisión al vendedor', Number(c.comision_estimada_pct), FORMATO_PORCENTAJE);
+  const filaComision = filaFormula('Comisión estimada/pagada (calculada)', `B${filaUtilNeta}*B${filaPctCom}`, FORMATO_MONEDA);
+  filaFormula('Ganancia neta para la empresa (calculada)', `B${filaUtilNeta}-B${filaComision}`, FORMATO_MONEDA);
 
   const hojaResumen: HojaExcel = {
     nombre: 'Resumen',
@@ -142,11 +185,22 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       { header: 'Campo', key: 'campo', tipo: 'texto' },
       { header: 'Valor', key: 'valor', tipo: 'texto' },
     ],
-    filas: resumenFilas.map((f) => ({ campo: f.campo, valor: f.valor })),
+    filas: filasResumen.map((f) => ({ campo: f.campo, valor: f.valor })),
   };
 
   const libro = construirLibro([hojaResumen, hojaDetalle, hojaCostos]);
   const wsResumen = libro.Sheets['Resumen'];
+  // Aplica las fórmulas/formatos reales sobre las celdas de la hoja ya construida,
+  // usando los números de fila calculados dinámicamente arriba (fila 1 = encabezado).
+  filasResumen.forEach((f, idx) => {
+    const filaNum = idx + 2;
+    const addr = `B${filaNum}`;
+    if (f.formula) {
+      wsResumen[addr] = { t: 'n', f: f.formula, z: f.formato };
+    } else if (f.formato && wsResumen[addr]) {
+      wsResumen[addr].z = f.formato;
+    }
+  });
 
   // Hoja "Cotización" — mismo documento que ve el vendedor internamente, con la misma
   // estructura del PDF (encabezado, tarjetas, tabla de ítems con costo/utilidad, totales,
@@ -156,38 +210,23 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const wsCotizacion = construirHojaCotizacion({
     cotizacion: cotizacion as Cotizacion,
     lineas: (lineas ?? []) as any,
-    parametros: parametros as ParametrosFiscales,
+    parametros: (parametros ?? null) as ParametrosFiscales,
     plantilla: (plantilla ?? null) as PlantillaCotizacion | null,
     clienteNombre: c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? 'Consumidor Final',
     clienteNit: c.cliente?.nit ?? c.cliente_nit,
     clienteDireccion: c.cliente?.direccion ?? c.cliente_direccion,
     vendedorNombre: c.vendedor?.nombre_completo ?? '—',
     vendedorCorreo: c.vendedor?.correo ?? null,
-  }, { interna: true });
+  }, { interna: true, puedeVerResumenFiscal });
   XLSX.utils.book_append_sheet(libro, wsCotizacion, 'Cotización');
   libro.SheetNames.unshift(libro.SheetNames.splice(libro.SheetNames.indexOf('Cotización'), 1)[0]);
 
-  const celdaMoneda = (fila: number) => { const a = `B${fila}`; if (wsResumen[a]) wsResumen[a].z = FORMATO_MONEDA; };
-  const celdaPorcentaje = (fila: number) => { const a = `B${fila}`; if (wsResumen[a]) wsResumen[a].z = FORMATO_PORCENTAJE; };
-  const celdaFormula = (fila: number, f: string, formato: string) => {
-    wsResumen[`B${fila}`] = { t: 'n', f, z: formato };
-  };
-
-  [10, 11, 12, 13, 14, 15, 19, 20].forEach(celdaMoneda);
-  celdaPorcentaje(9);
-  celdaPorcentaje(26);
-  // Cálculo condicional de impuestos: si el cliente es retenedor de IVA (B8 = "Sí"), se
-  // retiene el % parametrizado (B9) del IVA de la cotización; si no, la retención es 0.
-  celdaFormula(16, 'IF(B8="Sí",B13*B9,0)', FORMATO_MONEDA);
-  celdaFormula(17, 'B14-B15-B16', FORMATO_MONEDA);
-  celdaFormula(21, 'B19+B20', FORMATO_MONEDA);
-  celdaFormula(22, 'B12-B21', FORMATO_MONEDA); // Utilidad bruta = venta neta base - costo operación
-  celdaFormula(23, 'B22-B15', FORMATO_MONEDA); // Utilidad neta = utilidad bruta - ISR
-  celdaFormula(24, 'IF(B12=0,0,B23/B12)', FORMATO_PORCENTAJE);
-  celdaFormula(27, 'B23*B26', FORMATO_MONEDA); // Comisión = utilidad neta x % de la escala
-  celdaFormula(28, 'B23-B27', FORMATO_MONEDA);
-
   const buffer = libroABuffer(libro);
-  const nombreArchivo = `cotizacion_${(c.numero_sistema_externo || c.numero_interno).replace(/[^a-zA-Z0-9-]/g, '_')}.xlsx`;
+  const base = c.numero_sistema_externo || c.numero_interno || params.id;
+  const nombreArchivo = `cotizacion_${String(base).replace(/[^a-zA-Z0-9-]/g, '_')}.xlsx`;
   return respuestaExcel(buffer, nombreArchivo);
+  } catch (e) {
+    console.error('[excel/interno] fallo inesperado generando el Excel', params.id, e);
+    return NextResponse.json({ error: 'No se pudo generar el Excel de esta cotización. Intente de nuevo o contacte a soporte.' }, { status: 500 });
+  }
 }
