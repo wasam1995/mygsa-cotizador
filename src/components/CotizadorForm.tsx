@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { X, Eye } from 'lucide-react';
 import ProductPicker from './ProductPicker';
 import PrintQuote from './PrintQuote';
 import PrintQuoteInterno from './PrintQuoteInterno';
@@ -638,7 +639,9 @@ export default function CotizadorForm({
                              onChange={(e) => actualizarLinea(l.key, { incluir_especificaciones: e.target.checked })} />
                     </td>
                     <td className="py-2 text-right">
-                      <button type="button" onClick={() => eliminarLinea(l.key)} className="text-slate-400 hover:text-red-600">✕</button>
+                      <button type="button" onClick={() => eliminarLinea(l.key)} className="text-ink-muted hover:text-red-600" aria-label="Eliminar línea">
+                        <X className="h-4 w-4" strokeWidth={1.75} />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -709,7 +712,9 @@ export default function CotizadorForm({
                     </td>
                     <td className="py-2 pr-2 font-semibold text-slate-700">{formatQ(round2(c.cantidad * c.dias * c.costo_unitario))}</td>
                     <td className="py-2 text-right">
-                      <button type="button" onClick={() => eliminarCostoOperativo(c.key)} className="text-slate-400 hover:text-red-600">✕</button>
+                      <button type="button" onClick={() => eliminarCostoOperativo(c.key)} className="text-ink-muted hover:text-red-600" aria-label="Eliminar costo operativo">
+                        <X className="h-4 w-4" strokeWidth={1.75} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -883,11 +888,12 @@ export default function CotizadorForm({
         )}
       </div>
 
-      <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 p-4 backdrop-blur sm:flex-row sm:justify-end lg:-mx-8 lg:px-8">
+      <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-line bg-white p-4 sm:flex-row sm:justify-end lg:-mx-8 lg:px-8">
         <button type="button" onClick={() => router.push(modoEdicion ? `/cotizaciones/${cotOriginal!.id}` : '/cotizaciones')} className="btn btn-ghost">Cancelar</button>
         {modoEdicion ? (
           <button type="button" disabled={guardando} onClick={abrirPreview} className="btn btn-orange">
-            {guardando ? 'Guardando…' : '👁️ Vista previa y guardar'}
+            <Eye className="h-4 w-4" strokeWidth={1.75} />
+            {guardando ? 'Guardando…' : 'Vista previa y guardar'}
           </button>
         ) : (
           <>
@@ -895,7 +901,8 @@ export default function CotizadorForm({
               Guardar borrador
             </button>
             <button type="button" disabled={guardando} onClick={abrirPreview} className="btn btn-orange">
-              {guardando ? 'Guardando…' : '👁️ Vista previa y guardar'}
+              <Eye className="h-4 w-4" strokeWidth={1.75} />
+              {guardando ? 'Guardando…' : 'Vista previa y guardar'}
             </button>
           </>
         )}
@@ -920,6 +927,7 @@ export default function CotizadorForm({
           clienteContacto={previewCliente.contacto}
           vendedorNombre={previewVendedor.nombre}
           vendedorCorreo={previewVendedor.correo}
+          puedeVerResumenFiscal={puedeVerResumenFiscal}
         />
       )}
     </div>
@@ -933,6 +941,7 @@ function PreviewGuardado({
   tab, onCambiarTab, guardando, onCerrar, onConfirmar,
   cotizacion, lineas, costosOperativos, prorrateoPorLinea, parametros, plantilla,
   clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
+  puedeVerResumenFiscal,
 }: {
   tab: 'cliente' | 'interno';
   onCambiarTab: (t: 'cliente' | 'interno') => void;
@@ -951,6 +960,9 @@ function PreviewGuardado({
   clienteContacto: string | null;
   vendedorNombre: string;
   vendedorCorreo: string | null;
+  // Ver el comentario en el componente principal (CotizadorForm) — mismo criterio fijo
+  // (Autorizador/Administrador), solo se pasa hacia abajo hasta el PDF de vista previa.
+  puedeVerResumenFiscal: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/60 p-3 sm:p-6">
@@ -1003,6 +1015,7 @@ function PreviewGuardado({
                 clienteContacto={clienteContacto}
                 vendedorNombre={vendedorNombre}
                 vendedorCorreo={vendedorCorreo}
+                puedeVerResumenFiscal={puedeVerResumenFiscal}
               />
             </PdfPreview>
           )}

@@ -10,10 +10,7 @@ function colorPunto(clases: string): string {
 
 export default function StatusBadge({ estado }: { estado: EstadoCotizacion }) {
   return (
-    <span className={classNames(
-      'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold',
-      ESTADOS_COLOR[estado]
-    )}>
+    <span className={classNames('badge', ESTADOS_COLOR[estado])}>
       <span className={classNames('badge-dot', colorPunto(ESTADOS_COLOR[estado]))} />
       {ESTADOS_LABEL[estado]}
     </span>
