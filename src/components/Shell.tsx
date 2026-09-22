@@ -107,7 +107,7 @@ export default function Shell({
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-orange text-xs font-bold">MG</div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-tight">Estructuras MG</p>
+            <p className="truncate text-sm font-semibold leading-tight">MYGSA</p>
             <p className="truncate text-[11px] text-white/40">Cotizador · Inventario</p>
           </div>
           <button
