@@ -28,16 +28,16 @@ export default function ActualizarClavePage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-navy-800 via-navy-700 to-brand-orangeDark px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-7 shadow-xl">
-        <h2 className="mb-5 text-lg font-semibold text-slate-800">Nueva contraseña</h2>
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
+      <div className="card w-full max-w-sm">
+        <h2 className="section-title mb-5">Nueva contraseña</h2>
         {listo ? (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          <p className="alert alert-success">
             Contraseña actualizada. Redirigiendo al inicio de sesión…
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+            {error && <div className="alert alert-danger">{error}</div>}
             <div>
               <label className="label">Nueva contraseña</label>
               <input type="password" required minLength={8} value={clave} onChange={(e) => setClave(e.target.value)} className="input" />
