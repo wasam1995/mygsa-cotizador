@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { LayoutGrid, List } from 'lucide-react';
 import { requireSesion } from '@/lib/auth';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
@@ -57,8 +58,14 @@ export default async function CotizacionesPage({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">Cotizaciones</h1>
         <div className="flex gap-2">
-          <Link href="?vista=bandejas" className={`btn btn-secondary ${!vistaTabla && !soloPendientes ? '!bg-navy-700 !text-white' : ''}`}>🔀 Pipeline</Link>
-          <Link href="?vista=tabla" className={`btn btn-secondary ${vistaTabla ? '!bg-navy-700 !text-white' : ''}`}>Tabla</Link>
+          <Link href="?vista=bandejas" className={`btn btn-secondary ${!vistaTabla && !soloPendientes ? '!bg-navy-700 !text-white' : ''}`}>
+            <LayoutGrid className="h-4 w-4" strokeWidth={1.75} />
+            Pipeline
+          </Link>
+          <Link href="?vista=tabla" className={`btn btn-secondary ${vistaTabla ? '!bg-navy-700 !text-white' : ''}`}>
+            <List className="h-4 w-4" strokeWidth={1.75} />
+            Tabla
+          </Link>
           {sesion.permisos.includes('COTIZACIONES_CREAR') && (
             <Link href="/cotizaciones/nueva" className="btn btn-orange">+ Nueva</Link>
           )}
