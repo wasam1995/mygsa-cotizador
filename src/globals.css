@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   Rediseño empresarial (2026-09) — ver tailwind.config.ts para los tokens de color,
+   sombra y tipografía. Este archivo define los componentes compartidos (.btn, .card,
+   .input, tablas, badges…) que ya usa toda la app — al cambiar sus reglas aquí, el
+   cambio se propaga automáticamente a cada módulo sin tener que editar cada página.
+   Principios aplicados: sin gradientes decorativos, sombras mínimas, radios moderados,
+   sin animaciones de "lift"/escala, jerarquía tipográfica compacta (Inter, 13–14px base).
+   ============================================================================ */
+
+/* Fondo plano — antes había un radial-gradient decorativo cubriendo toda la pantalla,
+   uno de los patrones más típicos de "hecho por IA". El color real vive en
+   tailwind.config.ts (canvas) y se aplica con bg-canvas en <body> (ver layout.tsx);
+   esta regla es solo el respaldo antes de que cargue el CSS de Tailwind. */
+html, body {
+  background-color: #F7F8FA;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+  .print-area { box-shadow: none !important; margin: 0 !important; }
+}
+
+/* ---------- Formularios ---------- */
+
+.input {
+  @apply w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink
+    placeholder:text-ink-muted transition-colors focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-500/15
+    disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-ink-muted;
+}
+
+.label {
+  @apply mb-1 block text-xs font-medium text-ink-secondary;
+}
+
+.helper-text {
+  @apply mt-1 text-xs text-ink-muted;
+}
+
+.error-text {
+  @apply mt-1 text-xs font-medium text-red-600;
+}
+
+/* ---------- Botones ---------- */
+/* Compactos y funcionales, sin animación de escala ni sombras "glow" al pasar el
+   mouse — solo un cambio de color discreto. */
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium
+    transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+}
+.btn-primary { @apply bg-navy-700 text-white hover:bg-navy-800; }
+.btn-secondary { @apply border border-line bg-white text-ink hover:border-line-strong hover:bg-slate-50; }
+.btn-orange { @apply bg-brand-orange text-white hover:bg-brand-orangeDark; }
+.btn-danger { @apply bg-red-600 text-white hover:bg-red-700; }
+.btn-ghost { @apply text-ink-secondary hover:bg-slate-100 hover:text-ink; }
+
+/* ---------- Superficies ---------- */
+/* El rediseño reduce el uso de tarjetas: se conserva la clase .card para los bloques
+   que sí necesitan un contenedor propio (formularios, resúmenes), con un borde sutil en
+   vez de una sombra pronunciada, y radio moderado (no rounded-2xl). */
+
+.card {
+  @apply rounded-lg border border-line bg-white p-5 shadow-card;
+}
+.card-hover {
+  @apply transition-colors hover:border-line-strong;
+}
+
+/* Título principal de cada página */
+.page-title {
+  @apply text-page-title text-ink;
+}
+
+/* Subtítulo de sección dentro de una tarjeta */
+.section-title {
+  @apply text-section-title text-ink;
+}
+
+/* ---------- Tablas ---------- */
+/* Las tablas son el componente más importante del sistema (financiero/administrativo):
+   encabezado discreto, filas compactas, hover muy sutil, sin convertir cada fila en
+   una tarjeta. */
+
+.table-head-row {
+  @apply border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-ink-muted;
+}
+
+.table-row-hover {
+  @apply border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50;
+}
+
+/* Columnas numéricas (montos, cantidades) — alineadas a la derecha, con la fuente
+   tabular para que los dígitos no "bailen" entre filas. */
+.table-num {
+  @apply text-right tabular-nums;
+}
+
+/* ---------- Badges de estado ---------- */
+/* Pequeños y discretos — la forma de píldora (rounded-full) es un patrón estándar de
+   badge en software empresarial (Stripe, Linear, Dynamics lo usan igual), la diferencia
+   con una interfaz genérica está en el tamaño contenido y en que el color comunica
+   estado, no decoración. */
+
+.badge {
+  @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium;
+}
+.badge-dot {
+  @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full;
+}
+.badge-neutral { @apply border-line bg-slate-50 text-ink-secondary; }
+.badge-success { @apply border-emerald-200 bg-emerald-50 text-emerald-700; }
+.badge-warning { @apply border-amber-200 bg-amber-50 text-amber-700; }
+.badge-danger { @apply border-red-200 bg-red-50 text-red-700; }
+.badge-info { @apply border-sky-200 bg-sky-50 text-sky-700; }
+
+/* ---------- Alertas ---------- */
+
+.alert {
+  @apply flex items-start gap-2.5 rounded-md border px-3.5 py-3 text-sm;
+}
+.alert-info { @apply border-sky-200 bg-sky-50 text-sky-800; }
+.alert-success { @apply border-emerald-200 bg-emerald-50 text-emerald-800; }
+.alert-warning { @apply border-amber-200 bg-amber-50 text-amber-800; }
+.alert-danger { @apply border-red-200 bg-red-50 text-red-800; }
