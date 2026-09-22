@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { Download } from 'lucide-react';
 import { requireSesion } from '@/lib/auth';
 import KardexClient from './KardexClient';
 import type { MovimientoInventario } from '@/lib/types';
@@ -25,10 +26,11 @@ export default async function KardexPage({ searchParams }: { searchParams: { pro
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">Kardex de inventario</h1>
         <a href={`/api/kardex/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
-          ⬇️ Exportar Excel
+          <Download className="h-4 w-4" strokeWidth={1.75} />
+          Exportar Excel
         </a>
       </div>
-      <p className="mb-4 text-sm text-slate-500">
+      <p className="mb-4 text-sm text-ink-secondary">
         Historial de entradas, salidas, reservas, anulaciones y ajustes — con cotización, cliente y vendedor asociados.
       </p>
 
