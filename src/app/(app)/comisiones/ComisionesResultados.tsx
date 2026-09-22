@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Download, Check, X } from 'lucide-react';
 import { formatQ, formatFecha } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import StatCard from '@/components/StatCard';
@@ -59,7 +60,8 @@ export default function ComisionesResultados({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">Comisiones {verTodas ? 'por vendedor' : ''}</h1>
         <a href={`/api/comisiones/excel?${new URLSearchParams(searchParams as Record<string, string>).toString()}`} className="btn btn-secondary">
-          ⬇️ Exportar Excel
+          <Download className="h-4 w-4" strokeWidth={1.75} />
+          Exportar Excel
         </a>
       </div>
 
@@ -186,14 +188,14 @@ function FilaComision({
         {editando ? (
           <div className="flex items-center gap-1">
             <input className="input" value={comentario} onChange={(e) => setComentario(e.target.value)} />
-            <button disabled={guardando} className="text-xs font-semibold text-emerald-600 hover:underline" onClick={async () => {
+            <button disabled={guardando} className="text-emerald-600 hover:text-emerald-700" aria-label="Guardar comentario" onClick={async () => {
               setGuardando(true);
               await actualizarComentarioComision(c.id, comentario);
               setGuardando(false);
               setEditando(false);
               onCambio();
-            }}>✓</button>
-            <button className="text-xs font-semibold text-slate-400 hover:underline" onClick={() => { setComentario(c.comentario ?? ''); setEditando(false); }}>✕</button>
+            }}><Check className="h-4 w-4" strokeWidth={2} /></button>
+            <button className="text-ink-muted hover:text-ink" aria-label="Cancelar" onClick={() => { setComentario(c.comentario ?? ''); setEditando(false); }}><X className="h-4 w-4" strokeWidth={1.75} /></button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
