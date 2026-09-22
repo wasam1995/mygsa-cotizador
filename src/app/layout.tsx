@@ -15,14 +15,33 @@ const inter = localFont({
   display: 'swap',
 });
 
+// metadataBase resuelve las URLs absolutas del ícono/OG que Next genera solo a partir de
+// icon.png / apple-icon.png / opengraph-image.png (archivos en src/app/) — sin esto, esas
+// imágenes quedarían con URL relativa y algunos clientes (WhatsApp, Messenger) no las
+// resuelven bien al mostrar la vista previa del enlace.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://mygsa-cotizador.vercel.app';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: process.env.NEXT_PUBLIC_APP_NAME || 'MYGSA · Cotizador',
   description: 'Sistema de cotizaciones, inventario y comisiones — Estructuras MG',
+  appleWebApp: {
+    title: 'MG Cotizador',
+    statusBarStyle: 'default',
+  },
+  openGraph: {
+    title: 'Estructuras MG — Cotizador',
+    description: 'Sistema de Cotizaciones, Inventario y Comisiones',
+    siteName: 'Estructuras MG',
+    locale: 'es_GT',
+    type: 'website',
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  themeColor: '#172436',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
