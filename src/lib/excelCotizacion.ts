@@ -41,7 +41,15 @@ function rangoMerge(colDesde: number, colHasta: number, fila: number) {
  * y fórmulas reales de Excel donde corresponde (igual que el resto de hojas de este
  * sistema).
  */
-export function construirHojaCotizacion(ctx: ContextoCotizacion, opciones: { interna: boolean }): XLSX.WorkSheet {
+export function construirHojaCotizacion(
+  ctx: ContextoCotizacion,
+  // puedeVerResumenFiscal: el Resumen Fiscal (retenciones/base gravable) solo lo ven
+  // Autorizador y Administrador — decisión explícita del cliente, no un permiso
+  // configurable, mismo criterio que en pantalla/PDF interno. Por defecto true para no
+  // romper llamadores que todavía no lo pasan explícitamente; solo aplica cuando
+  // interna=true (la versión cliente nunca lleva este bloque, con o sin esta opción).
+  opciones: { interna: boolean; puedeVerResumenFiscal?: boolean }
+): XLSX.WorkSheet {
   const { cotizacion: c, lineas, plantilla, clienteNombre, clienteNit, clienteDireccion, vendedorNombre, vendedorCorreo } = ctx;
   // Defensivo: en datos reales puede que la fila de parametros_fiscales no llegue (fallo de
   // red/consulta puntual, fila borrada, etc.) — antes esto tronaba con un TypeError no
@@ -51,6 +59,7 @@ export function construirHojaCotizacion(ctx: ContextoCotizacion, opciones: { int
   // (con textos genéricos donde falte el dato) en lugar de fallar por completo.
   const parametros: Partial<ParametrosFiscales> = ctx.parametros ?? {};
   const interna = opciones.interna;
+  const puedeVerResumenFiscal = opciones.puedeVerResumenFiscal ?? true;
   const mostrarPrecios = interna || c.mostrar_precios_unitarios_cliente;
   const colCount = interna ? 7 : 5; // interna agrega Costo unit. y Utilidad línea
   const colValor = colCount - 1;
@@ -193,14 +202,21 @@ export function construirHojaCotizacion(ctx: ContextoCotizacion, opciones: { int
   agregar(vacia());
 
   // --- Bloque financiero interno (confidencial) ---
-  if (interna) {
-    agregarAncha('RESUMEN FINANCIERO INTERNO (CONFIDENCIAL)');
+  // El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+  // Administrador — decisión explícita del cliente, no un permiso configurable, igual que
+  // en pantalla y en el PDF interno. "Utilidad y comisión" sí la ve cualquiera con acceso
+  // a la vista interna (por ejemplo un vendedor viendo sus propias cotizaciones).
+  if (interna && puedeVerResumenFiscal) {
+    agregarAncha('RESUMEN FISCAL');
     agregarMoneda('Venta neta base (sin IVA)', Number(c.base_gravable));
     agregarMoneda(`IVA (${(Number(parametros.iva_porcentaje ?? 0.12) * 100).toFixed(0)}%)`, Number(c.iva_monto));
     agregarMoneda('Retención ISR', Number(c.isr_retencion));
     agregarMoneda(`Retención IVA (${(Number(parametros.retencion_iva_porcentaje ?? 0.15) * 100).toFixed(0)}% del IVA, si el cliente es retenedor)`, Number(c.iva_retencion));
     agregarMoneda('Pago neto que recibe la empresa', Number(c.pago_neto_empresa));
     agregar(vacia());
+  }
+  if (interna) {
+    agregarAncha('UTILIDAD Y COMISIÓN (CONFIDENCIAL)');
     agregarMoneda('Base para comisiones (total cotización - IVA - ISR)', Number(c.base_gravable) - Number(c.isr_retencion));
     agregarMoneda('Costo total de productos/servicios', Number(c.costo_total_productos));
     agregarMoneda('Gastos operativos adicionales', Number(c.costos_operativos_total));
