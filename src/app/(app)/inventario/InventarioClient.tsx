@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Download, RefreshCw } from 'lucide-react';
 import { formatQ } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { actualizarProducto, crearProducto, registrarEntradaInventario, obtenerReservasProducto, recalcularStockInventario } from './actions';
@@ -66,8 +67,8 @@ export default function InventarioClient({ productos, puedeEditar, puedeVerCosto
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input className="input max-w-xs" placeholder="Buscar código o nombre…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         <div className="flex gap-2">
-          <a href="/api/inventario/excel" className="btn btn-secondary">⬇️ Exportar Excel</a>
-          {puedeEditar && <button className="btn btn-secondary" onClick={() => setMostrarConfirmarRecalculo(true)}>🔄 Recalcular stock</button>}
+          <a href="/api/inventario/excel" className="btn btn-secondary"><Download className="h-4 w-4" strokeWidth={1.75} />Exportar Excel</a>
+          {puedeEditar && <button className="btn btn-secondary" onClick={() => setMostrarConfirmarRecalculo(true)}><RefreshCw className="h-4 w-4" strokeWidth={1.75} />Recalcular stock</button>}
           {puedeEditar && <button className="btn btn-orange" onClick={() => setMostrarNuevo(true)}>+ Nuevo producto</button>}
         </div>
       </div>
