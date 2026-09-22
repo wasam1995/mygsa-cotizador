@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { activarDesactivarPlantilla, actualizarPlantilla, crearPlantilla, marcarPredeterminada, type PlantillaPayload } from './actions';
 import PrintQuote from '@/components/PrintQuote';
 import PdfPreview from '@/components/PdfPreview';
@@ -195,12 +196,12 @@ function FormularioPlantilla({
                 <div className="mb-1 flex items-center gap-2">
                   <div className="flex flex-col">
                     <button type="button" disabled={idx === 0} onClick={() => moverApartado(idx, -1)}
-                      className="leading-none text-slate-400 hover:text-navy-600 disabled:opacity-20" title="Subir">▲</button>
+                      className="text-ink-muted hover:text-navy-600 disabled:opacity-20" title="Subir"><ChevronUp className="h-4 w-4" strokeWidth={1.75} /></button>
                     <button type="button" disabled={idx === datos.apartados.length - 1} onClick={() => moverApartado(idx, 1)}
-                      className="leading-none text-slate-400 hover:text-navy-600 disabled:opacity-20" title="Bajar">▼</button>
+                      className="text-ink-muted hover:text-navy-600 disabled:opacity-20" title="Bajar"><ChevronDown className="h-4 w-4" strokeWidth={1.75} /></button>
                   </div>
                   <input className="input flex-1" placeholder="Título del apartado" value={a.titulo} onChange={(e) => actualizarApartado(idx, { titulo: e.target.value })} />
-                  <button type="button" onClick={() => eliminarApartado(idx)} className="text-slate-400 hover:text-red-600">✕</button>
+                  <button type="button" onClick={() => eliminarApartado(idx)} className="text-ink-muted hover:text-red-600"><X className="h-4 w-4" strokeWidth={1.75} /></button>
                 </div>
                 <textarea className="input min-h-[60px] text-xs" placeholder="Contenido" value={a.contenido} onChange={(e) => actualizarApartado(idx, { contenido: e.target.value })} />
                 <div className="mt-1">
