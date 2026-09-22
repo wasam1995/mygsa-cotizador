@@ -24,15 +24,15 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://mygsa-cotizador.ve
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: process.env.NEXT_PUBLIC_APP_NAME || 'MYGSA · Cotizador',
-  description: 'Sistema de cotizaciones, inventario y comisiones — Estructuras MG',
+  description: 'Construcciones y Soluciones Metálicas M&G — Sistema de Cotizaciones, Inventario y Comisiones',
   appleWebApp: {
-    title: 'MG Cotizador',
+    title: 'MYGSA',
     statusBarStyle: 'default',
   },
   openGraph: {
-    title: 'Estructuras MG — Cotizador',
-    description: 'Sistema de Cotizaciones, Inventario y Comisiones',
-    siteName: 'Estructuras MG',
+    title: 'MYGSA — Cotizador',
+    description: 'Construcciones y Soluciones Metálicas M&G · Sistema de Cotizaciones, Inventario y Comisiones',
+    siteName: 'MYGSA',
     locale: 'es_GT',
     type: 'website',
   },

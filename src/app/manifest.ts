@@ -6,9 +6,9 @@ import type { MetadataRoute } from 'next';
 // el /manifest.webmanifest correspondiente, sin necesidad de enlazarlo a mano en <head>.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Estructuras MG — Cotizador',
-    short_name: 'MG Cotizador',
-    description: 'Sistema de Cotizaciones, Inventario y Comisiones — Estructuras MG',
+    name: 'MYGSA — Cotizador',
+    short_name: 'MYGSA',
+    description: 'Construcciones y Soluciones Metálicas M&G — Sistema de Cotizaciones, Inventario y Comisiones',
     start_url: '/dashboard',
     display: 'standalone',
     background_color: '#F7F8FA',
