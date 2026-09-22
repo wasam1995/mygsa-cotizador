@@ -13,6 +13,7 @@ type LineaConFoto = CotizacionDetalle & { producto?: { imagen_url: string | null
 export default function PrintQuoteInterno({
   cotizacion, lineas, costosOperativos, prorrateoPorLinea, parametros, plantilla,
   clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
+  puedeVerResumenFiscal = true,
 }: {
   cotizacion: Cotizacion;
   lineas: LineaConFoto[];
@@ -26,6 +27,11 @@ export default function PrintQuoteInterno({
   clienteContacto: string | null;
   vendedorNombre: string;
   vendedorCorreo: string | null;
+  // El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+  // Administrador — decisión explícita del cliente, no un permiso configurable. Se
+  // recibe ya resuelto desde quien arma el documento (mismo criterio que en pantalla).
+  // Por defecto true para no romper llamadores que todavía no lo pasan explícitamente.
+  puedeVerResumenFiscal?: boolean;
 }) {
   const pal = paletaPdf(parametros);
   const s = crearEstilos(pal);
@@ -144,18 +150,22 @@ export default function PrintQuoteInterno({
         {renderApartados(apartadosPor('antes_totales'))}
 
         <View style={s.filaResumenes} wrap={false}>
-          <View style={[s.resumen, { backgroundColor: pal.fondoAlterno }]}>
-            <Text style={s.apartadoTitulo}>Resumen fiscal</Text>
-            <FilaResumen label="Subtotal (incluye IVA)" valor={cotizacion.subtotal} />
-            <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
-            <FilaResumen label="Total cotizado" valor={cotizacion.total_cotizado} negrita />
-            <FilaResumen label="Venta neta base (sin IVA)" valor={cotizacion.base_gravable} />
-            <FilaResumen label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={cotizacion.iva_monto} />
-            <FilaResumen label="Retención ISR" valor={-cotizacion.isr_retencion} color="#dc2626" />
-            <FilaResumen label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_retencion} color="#dc2626" />
-            <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita color="#047857" />
-          </View>
-          <View style={[s.resumen, { backgroundColor: pal.fondoAlterno, marginLeft: 10 }]}>
+          {/* El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+              Administrador — decisión explícita del cliente, no un permiso configurable. */}
+          {puedeVerResumenFiscal && (
+            <View style={[s.resumen, { backgroundColor: pal.fondoAlterno }]}>
+              <Text style={s.apartadoTitulo}>Resumen fiscal</Text>
+              <FilaResumen label="Subtotal (incluye IVA)" valor={cotizacion.subtotal} />
+              <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
+              <FilaResumen label="Total cotizado" valor={cotizacion.total_cotizado} negrita />
+              <FilaResumen label="Venta neta base (sin IVA)" valor={cotizacion.base_gravable} />
+              <FilaResumen label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={cotizacion.iva_monto} />
+              <FilaResumen label="Retención ISR" valor={-cotizacion.isr_retencion} color="#dc2626" />
+              <FilaResumen label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_retencion} color="#dc2626" />
+              <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita color="#047857" />
+            </View>
+          )}
+          <View style={[s.resumen, { backgroundColor: pal.fondoAlterno, marginLeft: puedeVerResumenFiscal ? 10 : 0 }]}>
             <Text style={s.apartadoTitulo}>Utilidad y comisión</Text>
             <FilaResumen label="Total cotización (prospecto)" valor={cotizacion.total_cotizado} negrita />
             <FilaResumen label={`− IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_monto} color="#dc2626" />
