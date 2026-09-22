@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { actualizarEscalaComision, actualizarParametros, crearEscalaComision, eliminarEscalaComision } from './actions';
 import PrintQuote from '@/components/PrintQuote';
@@ -197,8 +198,8 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
                   </td>
                   <td className="py-2 text-right">
                     <button type="button" disabled={eliminandoEscala === e.rango} title="Eliminar este rango"
-                            onClick={() => eliminarEscala(e.rango)} className="text-slate-400 hover:text-red-600">
-                      {eliminandoEscala === e.rango ? '…' : '✕'}
+                            onClick={() => eliminarEscala(e.rango)} className="text-ink-muted hover:text-red-600">
+                      {eliminandoEscala === e.rango ? '…' : <X className="h-4 w-4" strokeWidth={1.75} />}
                     </button>
                   </td>
                 </tr>
