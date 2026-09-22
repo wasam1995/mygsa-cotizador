@@ -46,8 +46,8 @@ function LoginForm() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-navy-900 text-sm font-bold text-white">
             MG
           </div>
-          <h1 className="text-lg font-semibold text-ink">Estructuras MG</h1>
-          <p className="text-sm text-ink-secondary">Sistema de Cotizaciones, Inventario y Comisiones</p>
+          <h1 className="text-lg font-semibold text-ink">MYGSA</h1>
+          <p className="text-sm text-ink-secondary">Construcciones y Soluciones Metálicas M&amp;G</p>
         </div>
 
         <form onSubmit={handleSubmit} className="card">
