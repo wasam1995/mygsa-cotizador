@@ -50,7 +50,7 @@ export default async function DashboardPage() {
                 <th className="py-2 pr-3">No.</th>
                 <th className="py-2 pr-3">Fecha</th>
                 <th className="py-2 pr-3">Cliente</th>
-                <th className="py-2 pr-3">Total</th>
+                <th className="py-2 pr-3 text-right">Total</th>
                 <th className="py-2 pr-3">Estado</th>
               </tr>
             </thead>
@@ -58,18 +58,18 @@ export default async function DashboardPage() {
               {recientes.map((c) => (
                 <tr key={c.id} className="table-row-hover">
                   <td className="py-2.5 pr-3">
-                    <Link href={`/cotizaciones/${c.id}`} className="font-semibold text-navy-700 hover:underline">
+                    <Link href={`/cotizaciones/${c.id}`} className="font-medium text-navy-700 hover:underline">
                       {c.numero_interno}
                     </Link>
                   </td>
-                  <td className="py-2.5 pr-3 text-slate-500">{formatFecha(c.fecha_emision)}</td>
+                  <td className="py-2.5 pr-3 text-ink-secondary">{formatFecha(c.fecha_emision)}</td>
                   <td className="py-2.5 pr-3">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre ?? '—'}</td>
-                  <td className="py-2.5 pr-3 font-medium">{formatQ(c.total_cotizado)}</td>
+                  <td className="table-num py-2.5 pr-3 font-medium text-ink">{formatQ(c.total_cotizado)}</td>
                   <td className="py-2.5 pr-3"><StatusBadge estado={c.estado} /></td>
                 </tr>
               ))}
               {recientes.length === 0 && (
-                <tr><td colSpan={5} className="py-8 text-center text-slate-400">Aún no hay cotizaciones.</td></tr>
+                <tr><td colSpan={5} className="py-8 text-center text-ink-muted">Aún no hay cotizaciones.</td></tr>
               )}
             </tbody>
           </table>
