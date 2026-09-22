@@ -361,11 +361,13 @@ export const ESTADOS_LABEL: Record<EstadoCotizacion, string> = {
   ANULADO: 'Anulado',
 };
 
+// Tonos alineados al sistema .badge-* de globals.css (fondo 50, texto 700, borde 200) —
+// mismo nivel de saturación que el resto de badges de la app, sin colores llamativos.
 export const ESTADOS_COLOR: Record<EstadoCotizacion, string> = {
-  PROSPECTO: 'bg-slate-100 text-slate-700 border-slate-300',
-  PEND_AUTORIZAR: 'bg-amber-100 text-amber-800 border-amber-300',
-  ENVIADO_CLIENTE: 'bg-sky-100 text-sky-800 border-sky-300',
-  AUTORIZADO_CLIENTE: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-  FACTURADO: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  ANULADO: 'bg-red-100 text-red-700 border-red-300',
+  PROSPECTO: 'bg-slate-50 text-slate-700 border-slate-200',
+  PEND_AUTORIZAR: 'bg-amber-50 text-amber-700 border-amber-200',
+  ENVIADO_CLIENTE: 'bg-sky-50 text-sky-700 border-sky-200',
+  AUTORIZADO_CLIENTE: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  FACTURADO: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  ANULADO: 'bg-red-50 text-red-700 border-red-200',
 };
