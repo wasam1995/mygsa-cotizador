@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Printer, Download, Pencil, Trash2, RefreshCw, Paperclip } from 'lucide-react';
 import PrintQuote from '@/components/PrintQuote';
 import PrintQuoteInterno from '@/components/PrintQuoteInterno';
 import PdfPreview from '@/components/PdfPreview';
@@ -24,10 +25,15 @@ const TIPO_COLOR: Record<string, string> = {
 };
 
 export default function DetalleClient({
-  cotizacion, lineas, historial, adjuntos, costosOperativos, movimientos, parametros, plantilla, permisos, esCreador,
+  cotizacion, puedeVerResumenFiscal, lineas, historial, adjuntos, costosOperativos, movimientos, parametros, plantilla, permisos, esCreador,
   clienteNombre, clienteNit, clienteDireccion, clienteContacto, vendedorNombre, vendedorCorreo,
 }: {
   cotizacion: Cotizacion;
+  // El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+  // Administrador — decisión explícita del cliente, no un permiso configurable. Se
+  // decide en el Server Component (page.tsx) a partir de sesion.rolCodigo y se recibe
+  // ya resuelto aquí (mismo criterio que CotizadorForm.tsx).
+  puedeVerResumenFiscal: boolean;
   lineas: CotizacionDetalle[];
   historial: CotizacionHistorialEstado[];
   adjuntos: CotizacionAdjunto[];
@@ -134,6 +140,7 @@ export default function DetalleClient({
         prorrateoPorLinea={prorrateoPorLinea} parametros={parametros} plantilla={plantilla}
         clienteNombre={clienteNombre} clienteNit={clienteNit} clienteDireccion={clienteDireccion}
         clienteContacto={clienteContacto} vendedorNombre={vendedorNombre} vendedorCorreo={vendedorCorreo}
+        puedeVerResumenFiscal={puedeVerResumenFiscal}
       />
     ) : (
       <PrintQuote
@@ -241,32 +248,43 @@ export default function DetalleClient({
         <div className="flex items-center gap-2">
           <StatusBadge estado={cotizacion.estado} />
           <button onClick={() => handleAbrirPDF('cliente')} disabled={abriendoPdf !== null} className="btn btn-secondary">
-            {abriendoPdf === 'cliente' ? 'Abriendo…' : '🖨️ Abrir / imprimir'}
+            <Printer className="h-4 w-4" strokeWidth={1.75} />
+            {abriendoPdf === 'cliente' ? 'Abriendo…' : 'Abrir / imprimir'}
           </button>
           <button onClick={() => handleDescargarPDF('cliente')} disabled={generandoPdf !== null} className="btn btn-secondary">
-            {generandoPdf === 'cliente' ? 'Generando…' : '⬇️ PDF cliente'}
+            <Download className="h-4 w-4" strokeWidth={1.75} />
+            {generandoPdf === 'cliente' ? 'Generando…' : 'PDF cliente'}
           </button>
           {puedeVerInterno && (
             <button onClick={() => handleDescargarPDF('interno')} disabled={generandoPdf !== null} className="btn btn-secondary">
-              {generandoPdf === 'interno' ? 'Generando…' : '⬇️ PDF interno'}
+              <Download className="h-4 w-4" strokeWidth={1.75} />
+              {generandoPdf === 'interno' ? 'Generando…' : 'PDF interno'}
             </button>
           )}
           <button onClick={() => handleDescargarExcel('cliente')} disabled={generandoExcel !== null} className="btn btn-secondary">
-            {generandoExcel === 'cliente' ? 'Generando…' : '⬇️ Excel cliente'}
+            <Download className="h-4 w-4" strokeWidth={1.75} />
+            {generandoExcel === 'cliente' ? 'Generando…' : 'Excel cliente'}
           </button>
           {puedeVerInterno && (
             <button onClick={() => handleDescargarExcel('interno')} disabled={generandoExcel !== null} className="btn btn-secondary">
-              {generandoExcel === 'interno' ? 'Generando…' : '⬇️ Excel interno'}
+              <Download className="h-4 w-4" strokeWidth={1.75} />
+              {generandoExcel === 'interno' ? 'Generando…' : 'Excel interno'}
             </button>
           )}
           {puedeModificarOEliminar && (
-            <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">✏️ Modificar</Link>
+            <Link href={`/cotizaciones/${cotizacion.id}/editar`} className="btn btn-secondary">
+              <Pencil className="h-4 w-4" strokeWidth={1.75} />
+              Modificar
+            </Link>
           )}
           {/* Una cotización FACTURADA ya no se puede eliminar directamente (movió inventario
               real y generó comisión) — hay que anularla primero, desde la tarjeta de
               Acciones de abajo. Mostrar el botón aquí solo llevaría a un error al hacer clic. */}
           {puedeModificarOEliminar && cotizacion.estado !== 'FACTURADO' && (
-            <button onClick={() => setMostrarConfirmarEliminar(true)} className="btn btn-danger">🗑️ Eliminar</button>
+            <button onClick={() => setMostrarConfirmarEliminar(true)} className="btn btn-danger">
+              <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+              Eliminar
+            </button>
           )}
         </div>
       </div>
@@ -448,25 +466,30 @@ export default function DetalleClient({
                   esta cotización — si después cambiaron, recalcule para aplicar los valores actuales.
                 </p>
                 <button disabled={recalculando} className="btn btn-secondary whitespace-nowrap" onClick={handleRecalcular}>
-                  {recalculando ? 'Recalculando…' : '🔄 Recalcular con parámetros actuales'}
+                  <RefreshCw className="h-4 w-4" strokeWidth={1.75} />
+                  {recalculando ? 'Recalculando…' : 'Recalcular con parámetros actuales'}
                 </button>
               </div>
             </div>
           )}
 
-          <div className="card grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div>
-              <h2 className="mb-2 section-title">Resumen fiscal</h2>
-              <FilaResumen label="Subtotal (con IVA)" valor={cotizacion.subtotal} />
-              <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
-              <FilaResumen label="Total cotizado (incluye IVA)" valor={cotizacion.total_cotizado} negrita grande />
-              <FilaResumen label="Base gravable (sin IVA)" valor={cotizacion.base_gravable} />
-              <FilaResumen label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={cotizacion.iva_monto} />
-              <hr className="my-2" />
-              <FilaResumen label="Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
-              <FilaResumen label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_retencion} tono="text-red-600" />
-              <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita tono="text-emerald-700" />
-            </div>
+          <div className={`card grid grid-cols-1 gap-6 ${puedeVerResumenFiscal ? 'lg:grid-cols-2' : ''}`}>
+            {/* El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+                Administrador — decisión explícita del cliente, no un permiso configurable. */}
+            {puedeVerResumenFiscal && (
+              <div>
+                <h2 className="mb-2 section-title">Resumen fiscal</h2>
+                <FilaResumen label="Subtotal (con IVA)" valor={cotizacion.subtotal} />
+                <FilaResumen label="Descuentos" valor={-cotizacion.total_descuentos} />
+                <FilaResumen label="Total cotizado (incluye IVA)" valor={cotizacion.total_cotizado} negrita grande />
+                <FilaResumen label="Base gravable (sin IVA)" valor={cotizacion.base_gravable} />
+                <FilaResumen label={`IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={cotizacion.iva_monto} />
+                <hr className="my-2" />
+                <FilaResumen label="Retención ISR" valor={-cotizacion.isr_retencion} tono="text-red-600" />
+                <FilaResumen label={`Retención IVA (${(parametros.retencion_iva_porcentaje * 100).toFixed(0)}%)`} valor={-cotizacion.iva_retencion} tono="text-red-600" />
+                <FilaResumen label="Pago neto a la empresa" valor={cotizacion.pago_neto_empresa} negrita tono="text-emerald-700" />
+              </div>
+            )}
             <div>
               <h2 className="mb-2 section-title">Utilidad y comisión (uso interno)</h2>
               <FilaResumen label="Total cotización (prospecto)" valor={cotizacion.total_cotizado} negrita />
@@ -496,8 +519,9 @@ export default function DetalleClient({
               <ul className="mb-3 space-y-1">
                 {adjuntos.map((a) => (
                   <li key={a.id}>
-                    <button onClick={() => verAdjunto(a.ruta_storage)} className="text-sm text-navy-600 hover:underline">
-                      📎 {a.nombre_archivo}
+                    <button onClick={() => verAdjunto(a.ruta_storage)} className="inline-flex items-center gap-1.5 text-sm text-navy-600 hover:underline">
+                      <Paperclip className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+                      {a.nombre_archivo}
                     </button>
                   </li>
                 ))}
