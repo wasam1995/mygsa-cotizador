@@ -33,9 +33,15 @@ export default async function CotizacionDetallePage({ params }: { params: { id: 
   const cli = (cotizacion as any).cliente;
   const ven = (cotizacion as any).vendedor;
 
+  // El Resumen Fiscal (retenciones/base gravable) solo lo ven Autorizador y
+  // Administrador — decisión explícita del cliente, no un permiso configurable, y el
+  // mismo criterio fijo que ya se usa en el formulario del Cotizador (nueva/editar).
+  const puedeVerResumenFiscal = sesion.rolCodigo === 'ADMINISTRADOR' || sesion.rolCodigo === 'AUTORIZADOR';
+
   return (
     <DetalleClient
       cotizacion={cotizacion as Cotizacion}
+      puedeVerResumenFiscal={puedeVerResumenFiscal}
       lineas={(lineas ?? []) as CotizacionDetalle[]}
       historial={(historial ?? []) as CotizacionHistorialEstado[]}
       adjuntos={(adjuntos ?? []) as CotizacionAdjunto[]}
