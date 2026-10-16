@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { actualizarEscalaComision, actualizarParametros, crearEscalaComision, eliminarEscalaComision } from './actions';
 import PrintQuote from '@/components/PrintQuote';
 import PdfPreview from '@/components/PdfPreview';
+import IconButton from '@/components/IconButton';
 import { crearCotizacionDemo } from '@/lib/pdf/demo';
 import type { EscalaComision, ParametrosFiscales } from '@/lib/types';
 
@@ -197,10 +198,14 @@ export default function ParametrosClient({ parametros, escalasComision }: { para
                     <input className="input" value={e.observacion ?? ''} onChange={(ev) => setEscala(e.rango, { observacion: ev.target.value })} />
                   </td>
                   <td className="py-2 text-right">
-                    <button type="button" disabled={eliminandoEscala === e.rango} title="Eliminar este rango"
-                            onClick={() => eliminarEscala(e.rango)} className="text-ink-muted hover:text-red-600">
-                      {eliminandoEscala === e.rango ? '…' : <X className="h-4 w-4" strokeWidth={1.75} />}
-                    </button>
+                    <IconButton
+                      label="Eliminar este rango"
+                      variant="danger"
+                      size="compact"
+                      disabled={eliminandoEscala === e.rango}
+                      icon={eliminandoEscala === e.rango ? <span className="text-xs">…</span> : <X className="h-4 w-4" strokeWidth={1.75} />}
+                      onClick={() => eliminarEscala(e.rango)}
+                    />
                   </td>
                 </tr>
               ))}
