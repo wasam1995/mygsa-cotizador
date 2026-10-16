@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Eye } from 'lucide-react';
+import IconButton from './IconButton';
 import ProductPicker from './ProductPicker';
 import PrintQuote from './PrintQuote';
 import PrintQuoteInterno from './PrintQuoteInterno';
@@ -639,9 +640,13 @@ export default function CotizadorForm({
                              onChange={(e) => actualizarLinea(l.key, { incluir_especificaciones: e.target.checked })} />
                     </td>
                     <td className="py-2 text-right">
-                      <button type="button" onClick={() => eliminarLinea(l.key)} className="text-ink-muted hover:text-red-600" aria-label="Eliminar línea">
-                        <X className="h-4 w-4" strokeWidth={1.75} />
-                      </button>
+                      <IconButton
+                        label="Eliminar línea"
+                        variant="danger"
+                        size="compact"
+                        icon={<X className="h-4 w-4" strokeWidth={1.75} />}
+                        onClick={() => eliminarLinea(l.key)}
+                      />
                     </td>
                   </tr>
                 );
@@ -712,9 +717,13 @@ export default function CotizadorForm({
                     </td>
                     <td className="py-2 pr-2 font-semibold text-slate-700">{formatQ(round2(c.cantidad * c.dias * c.costo_unitario))}</td>
                     <td className="py-2 text-right">
-                      <button type="button" onClick={() => eliminarCostoOperativo(c.key)} className="text-ink-muted hover:text-red-600" aria-label="Eliminar costo operativo">
-                        <X className="h-4 w-4" strokeWidth={1.75} />
-                      </button>
+                      <IconButton
+                        label="Eliminar costo operativo"
+                        variant="danger"
+                        size="compact"
+                        icon={<X className="h-4 w-4" strokeWidth={1.75} />}
+                        onClick={() => eliminarCostoOperativo(c.key)}
+                      />
                     </td>
                   </tr>
                 ))}

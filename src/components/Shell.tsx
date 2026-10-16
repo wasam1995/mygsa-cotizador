@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { classNames } from '@/lib/utils';
+import IconButton from './IconButton';
 
 interface NavItem {
   href: string;
@@ -110,13 +111,13 @@ export default function Shell({
             <p className="truncate text-sm font-semibold leading-tight">MYGSA</p>
             <p className="truncate text-[11px] text-white/40">Cotizador · Inventario</p>
           </div>
-          <button
-            className="ml-auto rounded-md p-1.5 text-white/50 hover:bg-white/10 hover:text-white lg:hidden"
+          <IconButton
+            label="Cerrar menú"
+            icon={<X className="h-4 w-4" />}
             onClick={() => setAbierto(false)}
-            aria-label="Cerrar menú"
-          >
-            <X className="h-4 w-4" />
-          </button>
+            wrapperClassName="ml-auto lg:hidden"
+            className="!text-white/50 hover:!bg-white/10 hover:!text-white"
+          />
         </div>
         <nav className="flex-1 space-y-4 overflow-y-auto px-2.5 py-4">
           {grupos.map((grupo) => (
@@ -162,9 +163,13 @@ export default function Shell({
       {/* Contenido */}
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-white px-4 lg:px-6">
-          <button className="rounded-md p-1.5 text-ink-secondary hover:bg-slate-100 lg:hidden" onClick={() => setAbierto(true)} aria-label="Abrir menú">
-            <Menu className="h-5 w-5" strokeWidth={1.75} />
-          </button>
+          <IconButton
+            label="Abrir menú"
+            icon={<Menu className="h-5 w-5" strokeWidth={1.75} />}
+            onClick={() => setAbierto(true)}
+            tooltipPosition="below"
+            wrapperClassName="lg:hidden"
+          />
           <h1 className="section-title">
             {NAV.find((n) => n.href === pathname)?.label ?? 'Panel'}
           </h1>
