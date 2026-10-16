@@ -57,7 +57,7 @@ export default async function CotizacionesPage({
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="page-title">Cotizaciones</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="?vista=bandejas" className={`btn btn-secondary ${!vistaTabla && !soloPendientes ? '!bg-navy-700 !text-white' : ''}`}>
             <LayoutGrid className="h-4 w-4" strokeWidth={1.75} />
             Pipeline
