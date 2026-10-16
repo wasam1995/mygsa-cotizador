@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  activarDesactivarUsuario, actualizarPermisosRol, cambiarRolUsuario, crearRol, crearUsuario, eliminarUsuario,
+  activarDesactivarUsuario, actualizarPermisosRol, cambiarPasswordUsuario, cambiarRolUsuario, crearRol, crearUsuario, eliminarUsuario,
 } from './actions';
 import type { Permiso, Rol, Usuario } from '@/lib/types';
 
@@ -87,6 +87,15 @@ function FilaUsuario({ u, roles, onCambio }: { u: UsuarioConRol; roles: Rol[]; o
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
+  // Cambio de contraseña directo (sin depender del correo/SMS de "Olvidé mi
+  // contraseña") — pensado para cuando ese usuario no puede ingresar y el enlace de
+  // recuperación no le llega o ya venció.
+  const [cambiandoPassword, setCambiandoPassword] = useState(false);
+  const [nuevaPassword, setNuevaPassword] = useState('');
+  const [guardandoPassword, setGuardandoPassword] = useState(false);
+  const [errorPassword, setErrorPassword] = useState<string | null>(null);
+  const [mensajePassword, setMensajePassword] = useState<string | null>(null);
+
   async function handleEliminar() {
     setGuardando(true);
     setErrorEliminar(null);
@@ -94,6 +103,17 @@ function FilaUsuario({ u, roles, onCambio }: { u: UsuarioConRol; roles: Rol[]; o
     setGuardando(false);
     setConfirmandoEliminar(false);
     if (r?.error) setErrorEliminar(r.error); else onCambio();
+  }
+
+  async function handleCambiarPassword() {
+    if (nuevaPassword.length < 8) { setErrorPassword('Use al menos 8 caracteres.'); return; }
+    setGuardandoPassword(true);
+    setErrorPassword(null);
+    const r = await cambiarPasswordUsuario(u.id, nuevaPassword);
+    setGuardandoPassword(false);
+    if (r?.error) { setErrorPassword(r.error); return; }
+    setMensajePassword('Contraseña actualizada — avísele al usuario la contraseña nueva.');
+    setNuevaPassword('');
   }
 
   return (
@@ -128,6 +148,13 @@ function FilaUsuario({ u, roles, onCambio }: { u: UsuarioConRol; roles: Rol[]; o
           <button
             className="mr-2 text-xs font-semibold text-navy-600 hover:underline"
             disabled={guardando}
+            onClick={() => { setCambiandoPassword((v) => !v); setErrorPassword(null); setMensajePassword(null); }}
+          >
+            Cambiar contraseña
+          </button>
+          <button
+            className="mr-2 text-xs font-semibold text-navy-600 hover:underline"
+            disabled={guardando}
             onClick={async () => {
               setGuardando(true);
               await activarDesactivarUsuario(u.id, !u.activo);
@@ -150,6 +177,35 @@ function FilaUsuario({ u, roles, onCambio }: { u: UsuarioConRol; roles: Rol[]; o
           )}
         </td>
       </tr>
+      {cambiandoPassword && (
+        <tr className="border-b border-slate-100 last:border-0 bg-navy-50/40">
+          <td colSpan={6} className="px-2 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500">Nueva contraseña para {u.nombre_completo}:</span>
+              <input
+                type="text"
+                className="input w-48"
+                placeholder="Mínimo 8 caracteres"
+                value={nuevaPassword}
+                onChange={(e) => setNuevaPassword(e.target.value)}
+                disabled={guardandoPassword}
+              />
+              <button className="btn btn-primary !py-1 !px-3 text-xs" disabled={guardandoPassword} onClick={handleCambiarPassword}>
+                {guardandoPassword ? 'Guardando…' : 'Guardar'}
+              </button>
+              <button
+                className="text-xs text-slate-400 hover:underline"
+                disabled={guardandoPassword}
+                onClick={() => { setCambiandoPassword(false); setNuevaPassword(''); setErrorPassword(null); }}
+              >
+                Cancelar
+              </button>
+            </div>
+            {errorPassword && <p className="mt-1 text-xs text-red-600">{errorPassword}</p>}
+            {mensajePassword && <p className="mt-1 text-xs text-emerald-600">{mensajePassword}</p>}
+          </td>
+        </tr>
+      )}
       {errorEliminar && (
         <tr className="border-b border-slate-100 last:border-0 bg-red-50">
           <td colSpan={6} className="px-2 py-2 text-xs text-red-700">{errorEliminar}</td>

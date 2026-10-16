@@ -42,6 +42,22 @@ export async function crearUsuario(payload: {
   return { ok: true };
 }
 
+// Permite a un Administrador fijar una contraseña nueva para otro usuario sin depender
+// del correo/SMS de recuperación (si el proveedor de correo no está configurado en
+// Supabase, o el usuario no tiene acceso a ese correo/teléfono, el flujo de "Olvidé mi
+// contraseña" nunca llega). Usa el cliente con Service Role — por eso vive en un Server
+// Action, nunca se expone al navegador.
+export async function cambiarPasswordUsuario(usuarioId: string, nuevaPassword: string) {
+  await requireSesion('USUARIOS_ADMINISTRAR');
+  if (nuevaPassword.length < 8) return { error: 'La contraseña debe tener al menos 8 caracteres.' };
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(usuarioId, { password: nuevaPassword });
+  if (error) return { error: error.message };
+
+  return { ok: true };
+}
+
 export async function cambiarRolUsuario(usuarioId: string, rolId: string) {
   await requireSesion('USUARIOS_ADMINISTRAR');
   const supabase = createClient();
