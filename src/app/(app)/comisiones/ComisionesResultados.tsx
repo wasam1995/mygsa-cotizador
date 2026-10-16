@@ -6,6 +6,7 @@ import { Download, Check, X } from 'lucide-react';
 import { formatQ, formatFecha } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import StatCard from '@/components/StatCard';
+import IconButton from '@/components/IconButton';
 import {
   crearLiquidacion, crearLiquidacionesGrupo, marcarLiquidacionPagada, reabrirLiquidacion,
   actualizarComentarioComision, actualizarLiquidacion, eliminarLiquidacion,
@@ -188,14 +189,26 @@ function FilaComision({
         {editando ? (
           <div className="flex items-center gap-1">
             <input className="input" value={comentario} onChange={(e) => setComentario(e.target.value)} />
-            <button disabled={guardando} className="text-emerald-600 hover:text-emerald-700" aria-label="Guardar comentario" onClick={async () => {
-              setGuardando(true);
-              await actualizarComentarioComision(c.id, comentario);
-              setGuardando(false);
-              setEditando(false);
-              onCambio();
-            }}><Check className="h-4 w-4" strokeWidth={2} /></button>
-            <button className="text-ink-muted hover:text-ink" aria-label="Cancelar" onClick={() => { setComentario(c.comentario ?? ''); setEditando(false); }}><X className="h-4 w-4" strokeWidth={1.75} /></button>
+            <IconButton
+              label="Guardar comentario"
+              variant="success"
+              size="compact"
+              disabled={guardando}
+              icon={<Check className="h-4 w-4" strokeWidth={2} />}
+              onClick={async () => {
+                setGuardando(true);
+                await actualizarComentarioComision(c.id, comentario);
+                setGuardando(false);
+                setEditando(false);
+                onCambio();
+              }}
+            />
+            <IconButton
+              label="Cancelar"
+              size="compact"
+              icon={<X className="h-4 w-4" strokeWidth={1.75} />}
+              onClick={() => { setComentario(c.comentario ?? ''); setEditando(false); }}
+            />
           </div>
         ) : (
           <div className="flex items-center gap-2">
