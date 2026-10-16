@@ -6,6 +6,7 @@ import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { activarDesactivarPlantilla, actualizarPlantilla, crearPlantilla, marcarPredeterminada, type PlantillaPayload } from './actions';
 import PrintQuote from '@/components/PrintQuote';
 import PdfPreview from '@/components/PdfPreview';
+import IconButton from '@/components/IconButton';
 import { crearCotizacionDemo } from '@/lib/pdf/demo';
 import type { ApartadoPlantilla, ParametrosFiscales, PlantillaCotizacion, PosicionApartado } from '@/lib/types';
 
@@ -194,14 +195,30 @@ function FormularioPlantilla({
             {datos.apartados.map((a, idx) => (
               <div key={idx} className="rounded-lg border border-slate-200 bg-white p-2">
                 <div className="mb-1 flex items-center gap-2">
-                  <div className="flex flex-col">
-                    <button type="button" disabled={idx === 0} onClick={() => moverApartado(idx, -1)}
-                      className="text-ink-muted hover:text-navy-600 disabled:opacity-20" title="Subir"><ChevronUp className="h-4 w-4" strokeWidth={1.75} /></button>
-                    <button type="button" disabled={idx === datos.apartados.length - 1} onClick={() => moverApartado(idx, 1)}
-                      className="text-ink-muted hover:text-navy-600 disabled:opacity-20" title="Bajar"><ChevronDown className="h-4 w-4" strokeWidth={1.75} /></button>
+                  <div className="flex flex-col gap-0.5">
+                    <IconButton
+                      label="Subir"
+                      size="compact"
+                      disabled={idx === 0}
+                      icon={<ChevronUp className="h-4 w-4" strokeWidth={1.75} />}
+                      onClick={() => moverApartado(idx, -1)}
+                    />
+                    <IconButton
+                      label="Bajar"
+                      size="compact"
+                      disabled={idx === datos.apartados.length - 1}
+                      icon={<ChevronDown className="h-4 w-4" strokeWidth={1.75} />}
+                      onClick={() => moverApartado(idx, 1)}
+                    />
                   </div>
                   <input className="input flex-1" placeholder="Título del apartado" value={a.titulo} onChange={(e) => actualizarApartado(idx, { titulo: e.target.value })} />
-                  <button type="button" onClick={() => eliminarApartado(idx)} className="text-ink-muted hover:text-red-600"><X className="h-4 w-4" strokeWidth={1.75} /></button>
+                  <IconButton
+                    label="Eliminar apartado"
+                    variant="danger"
+                    size="compact"
+                    icon={<X className="h-4 w-4" strokeWidth={1.75} />}
+                    onClick={() => eliminarApartado(idx)}
+                  />
                 </div>
                 <textarea className="input min-h-[60px] text-xs" placeholder="Contenido" value={a.contenido} onChange={(e) => actualizarApartado(idx, { contenido: e.target.value })} />
                 <div className="mt-1">
