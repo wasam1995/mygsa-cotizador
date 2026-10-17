@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react';
 import { formatQ } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { actualizarProducto, crearProducto, registrarEntradaInventario, obtenerReservasProducto, recalcularStockInventario } from './actions';
@@ -82,7 +82,7 @@ export default function InventarioClient({ productos, puedeEditar, puedeVerCosto
 
       {mostrarConfirmarRecalculo && (
         <div className="card border-sky-200 bg-sky-50">
-          <p className="text-sm font-bold text-sky-800">¿Recalcular el stock de todos los productos?</p>
+          <p className="text-sm font-semibold text-sky-800">¿Recalcular el stock de todos los productos?</p>
           <p className="mt-1 text-sm text-sky-700">
             Esto recorre todo el inventario y corrige dos cosas por producto: el <b>Reservado</b> (se recalcula desde
             las cotizaciones activas ahora mismo) y la <b>Existencia</b> (se restablece al último movimiento real
@@ -214,8 +214,9 @@ function FilaProducto({
         <td className="py-2 pr-2">{p.stock_actual}</td>
         <td className="py-2 pr-2">
           {p.stock_reservado > 0 ? (
-            <button className="font-semibold text-amber-700 underline decoration-dotted underline-offset-2" onClick={handleToggleReservas}>
-              {p.stock_reservado} {reservasAbiertas ? '▲' : '▼'}
+            <button className="inline-flex items-center gap-1 font-semibold text-amber-700 underline decoration-dotted underline-offset-2" onClick={handleToggleReservas}>
+              {p.stock_reservado}
+              {reservasAbiertas ? <ChevronUp className="h-3.5 w-3.5" strokeWidth={2} /> : <ChevronDown className="h-3.5 w-3.5" strokeWidth={2} />}
             </button>
           ) : (
             <span>0</span>
@@ -238,7 +239,7 @@ function FilaProducto({
       {reservasAbiertas && (
         <tr className="bg-amber-50">
           <td colSpan={8 + (puedeVerCostosEmpresa ? 1 : 0) + (puedeEditar ? 1 : 0)} className="p-3">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-700">Cotizaciones que reservan este producto</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">Cotizaciones que reservan este producto</p>
             {cargandoReservas && <p className="text-sm text-slate-500">Cargando…</p>}
             {errorReservas && <p className="text-sm text-red-600">{errorReservas}</p>}
             {!cargandoReservas && !errorReservas && reservas && reservas.length === 0 && (
@@ -306,7 +307,7 @@ function FilaProducto({
               {puedeVerCostosEmpresa && (
                 <>
                   <div className="w-full border-t border-dashed border-slate-300 pt-3">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Costos confidenciales (solo visibles para su rol)</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Costos confidenciales (solo visibles para su rol)</p>
                   </div>
                   <div><label className="label">Costo Importación</label><input type="number" step="0.01" className="input w-32" value={costoImportacion} onChange={(e) => setCostoImportacion(Number(e.target.value))} /></div>
                   <div><label className="label">% ganancia sobre costo</label><input type="number" step="0.1" className="input w-32" value={gananciaCostoPct} onChange={(e) => setGananciaCostoPct(Number(e.target.value))} /></div>
@@ -440,7 +441,7 @@ function NuevoProductoForm({ onClose, puedeVerCostosEmpresa }: { onClose: () => 
         {puedeVerCostosEmpresa && (
           <>
             <div className="sm:col-span-3 border-t border-dashed border-slate-300 pt-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Costos confidenciales (solo visibles para su rol)</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Costos confidenciales (solo visibles para su rol)</p>
             </div>
             <input type="number" step="0.01" className="input" placeholder="Costo Importación" value={costoImportacion} onChange={(e) => setCostoImportacion(Number(e.target.value))} />
             <input type="number" step="0.1" className="input" placeholder="% ganancia sobre costo" value={gananciaCostoPct} onChange={(e) => setGananciaCostoPct(Number(e.target.value))} />
