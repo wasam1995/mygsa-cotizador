@@ -106,7 +106,7 @@ export default async function ReporteCostos({
           </tbody>
           {filas.length > 0 && (
             <tfoot>
-              <tr className="border-t-2 border-slate-200 font-bold">
+              <tr className="border-t-2 border-slate-200 font-semibold">
                 <td className="py-2 pr-2">Total</td>
                 <td className="py-2 pr-2 text-right">{totales.cotizaciones}</td>
                 <td className="py-2 pr-2 text-right text-red-600">{formatQ(totales.costo_productos)}</td>
