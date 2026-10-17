@@ -43,7 +43,7 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-navy-900 text-sm font-bold text-white">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-navy-900 text-sm font-semibold text-white">
             MG
           </div>
           <h1 className="text-lg font-semibold text-ink">MYGSA</h1>
