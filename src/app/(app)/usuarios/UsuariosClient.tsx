@@ -368,7 +368,7 @@ function PermisosDeRol({
       <div className="space-y-4">
         {modulos.map(([modulo, lista]) => (
           <div key={modulo}>
-            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">{modulo}</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{modulo}</p>
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
               {lista.map((p) => (
                 <label key={p.id} className="flex items-start gap-2 text-sm text-slate-600">
@@ -435,7 +435,7 @@ function NuevoRolForm({
       <div className="mt-4 space-y-4">
         {modulos.map(([modulo, lista]) => (
           <div key={modulo}>
-            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">{modulo}</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{modulo}</p>
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
               {lista.map((p) => (
                 <label key={p.id} className="flex items-start gap-2 text-sm text-slate-600">
