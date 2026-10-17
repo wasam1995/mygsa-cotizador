@@ -96,7 +96,7 @@ html, body {
    una tarjeta. */
 
 .table-head-row {
-  @apply border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-ink-muted;
+  @apply border-b border-line text-left text-xs font-semibold uppercase tracking-wide text-ink-muted;
 }
 
 .table-row-hover {
@@ -116,7 +116,7 @@ html, body {
    estado, no decoración. */
 
 .badge {
-  @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium;
+  @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium;
 }
 .badge-dot {
   @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full;
@@ -126,6 +126,38 @@ html, body {
 .badge-warning { @apply border-amber-200 bg-amber-50 text-amber-700; }
 .badge-danger { @apply border-red-200 bg-red-50 text-red-700; }
 .badge-info { @apply border-sky-200 bg-sky-50 text-sky-700; }
+
+/* ---------- Botones de ícono (ver components/IconButton.tsx) ---------- */
+/* Antes varios de estos usaban `title="..."` (no es un tooltip real: no aparece con
+   teclado y en móvil no existe el "hover") o no tenían ninguna etiqueta. Este par de
+   clases + el componente IconButton dan un tooltip real, aria-label y un área de toque
+   consistente en toda la app. ".icon-btn" (44×44px) es el tamaño por defecto — suficiente
+   para tocar cómodo en celular; ".icon-btn-compact" (36×36px) es solo para filas de
+   tabla muy densas donde 44px rompería la densidad de la fila. */
+
+.icon-btn {
+  @apply relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-secondary
+    transition-colors hover:bg-slate-100 hover:text-ink
+    disabled:pointer-events-none disabled:opacity-40;
+}
+.icon-btn-compact {
+  @apply h-9 w-9;
+}
+.icon-btn-danger {
+  @apply hover:bg-red-50 hover:text-red-600;
+}
+.icon-btn-success {
+  @apply hover:bg-emerald-50 hover:text-emerald-600;
+}
+
+.icon-btn-tooltip {
+  @apply pointer-events-none absolute -top-1.5 left-1/2 z-50 -translate-x-1/2 -translate-y-full whitespace-nowrap
+    rounded-md bg-navy-900 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity
+    group-hover/icon-btn:opacity-100 group-focus-within/icon-btn:opacity-100;
+}
+.icon-btn-tooltip-below {
+  @apply top-auto bottom-[-0.375rem] translate-y-full;
+}
 
 /* ---------- Alertas ---------- */
 
