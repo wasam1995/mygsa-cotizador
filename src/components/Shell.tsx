@@ -106,10 +106,10 @@ export default function Shell({
         abierto ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-white/10 px-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-orange text-xs font-bold">MG</div>
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-orange text-xs font-semibold">MG</div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold leading-tight">MYGSA</p>
-            <p className="truncate text-[11px] text-white/40">Cotizador · Inventario</p>
+            <p className="truncate text-xs text-white/40">Cotizador · Inventario</p>
           </div>
           <IconButton
             label="Cerrar menú"
@@ -122,7 +122,7 @@ export default function Shell({
         <nav className="flex-1 space-y-4 overflow-y-auto px-2.5 py-4">
           {grupos.map((grupo) => (
             <div key={grupo.titulo}>
-              <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">{grupo.titulo}</p>
+              <p className="mb-1 px-2.5 text-xs font-semibold uppercase tracking-wider text-white/30">{grupo.titulo}</p>
               <div className="flex flex-col gap-0.5">
                 {grupo.items.map((item) => {
                   const activo = pathname === item.href;
@@ -150,7 +150,7 @@ export default function Shell({
             </div>
             <div className="min-w-0">
               <p className="truncate text-[13px] font-medium">{nombreCompleto}</p>
-              <p className="truncate text-[11px] text-white/40">{rolNombre}</p>
+              <p className="truncate text-xs text-white/40">{rolNombre}</p>
             </div>
           </div>
           <button onClick={salir} className="btn w-full justify-start gap-2.5 !px-2.5 text-[13px] text-white/60 hover:bg-white/[0.05] hover:text-white">

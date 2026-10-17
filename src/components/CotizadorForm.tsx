@@ -558,7 +558,7 @@ export default function CotizadorForm({
                   <tr key={l.key} className="border-b border-slate-100 align-top last:border-0">
                     <td className="py-2 pr-2">
                       {l.es_fuera_inventario ? (
-                        <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">LIBRE</span>
+                        <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700">LIBRE</span>
                       ) : (
                         <span className="font-mono text-xs text-slate-500">{l.codigo_mostrado}</span>
                       )}
@@ -572,16 +572,16 @@ export default function CotizadorForm({
                         <span className="text-slate-700">{l.descripcion}</span>
                       )}
                       {producto?.especificaciones && (
-                        <p className="mt-0.5 text-[11px] italic text-slate-400">{producto.especificaciones}</p>
+                        <p className="mt-0.5 text-xs italic text-slate-400">{producto.especificaciones}</p>
                       )}
-                      {excedeStock && <p className="mt-1 text-[11px] text-red-600">Excede el disponible ({l.stockDisponible} u.)</p>}
+                      {excedeStock && <p className="mt-1 text-xs text-red-600">Excede el disponible ({l.stockDisponible} u.)</p>}
                     </td>
                     <td className="py-2 pr-2">
                       <input type="number" min={0} step="0.01" className="input" value={l.cantidad}
                              max={l.stockDisponible ?? undefined}
                              onChange={(e) => actualizarLinea(l.key, { cantidad: Number(e.target.value) })} />
                       {l.stockDisponible !== null && (
-                        <p className="mt-0.5 text-[11px] text-slate-400">Disp.: {l.stockDisponible} u.</p>
+                        <p className="mt-0.5 text-xs text-slate-400">Disp.: {l.stockDisponible} u.</p>
                       )}
                     </td>
                     <td className="py-2 pr-2">
@@ -658,8 +658,8 @@ export default function CotizadorForm({
             {lineas.length > 0 && (
               <tfoot>
                 <tr className="border-t-2 border-slate-300">
-                  <td colSpan={8} className="py-2 pr-2 text-right font-bold text-slate-700">TOTAL</td>
-                  <td className="py-2 pr-2 font-bold text-slate-800">
+                  <td colSpan={8} className="py-2 pr-2 text-right font-semibold text-slate-700">TOTAL</td>
+                  <td className="py-2 pr-2 font-semibold text-slate-800">
                     {formatQ(round2(lineas.reduce((acc, l) => acc + round2(l.cantidad * l.precio_unitario - l.descuento_linea_monto), 0)))}
                   </td>
                   <td colSpan={3}></td>
@@ -842,7 +842,7 @@ export default function CotizadorForm({
                 Administrador — decisión explícita del cliente, no un permiso configurable. */}
             {puedeVerResumenFiscal && (
               <div>
-                <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Resumen fiscal (Guatemala)</h3>
+                <h3 className="mb-2 text-xs font-semibold uppercase text-slate-400">Resumen fiscal (Guatemala)</h3>
                 <dl className="space-y-1.5 text-sm">
                   <Fila label="Subtotal (con IVA)" valor={calculo.subtotalBruto} />
                   <Fila label="Descuentos (líneas + global)" valor={-calculo.totalDescuentos} />
@@ -857,7 +857,7 @@ export default function CotizadorForm({
               </div>
             )}
             <div>
-              <h3 className="mb-2 text-xs font-bold uppercase text-slate-400">Detalle de determinación de Comisiones</h3>
+              <h3 className="mb-2 text-xs font-semibold uppercase text-slate-400">Detalle de determinación de Comisiones</h3>
               <dl className="space-y-1.5 text-sm">
                 <Fila label="Total Cotización (Prospecto)" valor={calculo.totalCotizado} negrita />
                 <Fila label={`(−) IVA (${(parametros.iva_porcentaje * 100).toFixed(0)}%)`} valor={-calculo.ivaMonto} tono="text-red-600" />
@@ -886,7 +886,7 @@ export default function CotizadorForm({
                 <Fila label="Ganancia neta estimada para la empresa" valor={calculo.gananciaNetaEstimada} negrita grande tono="text-emerald-700" />
                 <div className={`mt-3 rounded-lg border p-3 text-center ${calculo.comisionEstimadaMonto > 0 ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Comisión estimada</p>
-                  <p className={`text-2xl font-black ${calculo.comisionEstimadaMonto > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{formatQ(calculo.comisionEstimadaMonto)}</p>
+                  <p className={`text-2xl font-semibold ${calculo.comisionEstimadaMonto > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{formatQ(calculo.comisionEstimadaMonto)}</p>
                   {calculo.escala?.rango === 1 && (
                     <p className="mt-1 text-xs text-amber-700">Esta cotización requiere aprobación gerencial (margen dentro del Rango 1).</p>
                   )}
@@ -978,7 +978,7 @@ function PreviewGuardado({
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 p-4">
           <div>
-            <h2 className="text-sm font-bold text-slate-800">Vista previa antes de guardar</h2>
+            <h2 className="text-sm font-semibold text-slate-800">Vista previa antes de guardar</h2>
             <p className="text-xs text-slate-500">Así se vería el documento — revíselo en ambas versiones antes de confirmar.</p>
           </div>
           <div className="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
@@ -1043,7 +1043,7 @@ function PreviewGuardado({
 
 function Fila({ label, valor, negrita, grande, tono }: { label: string; valor: number; negrita?: boolean; grande?: boolean; tono?: string }) {
   return (
-    <div className={`flex justify-between ${negrita ? 'font-bold text-slate-800' : 'text-slate-600'} ${grande ? 'text-base' : ''} ${tono ?? ''}`}>
+    <div className={`flex justify-between ${negrita ? 'font-semibold text-slate-800' : 'text-slate-600'} ${grande ? 'text-base' : ''} ${tono ?? ''}`}>
       <dt>{label}</dt>
       <dd>{formatQ(valor)}</dd>
     </div>
