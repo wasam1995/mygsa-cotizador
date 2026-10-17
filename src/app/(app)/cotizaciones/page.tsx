@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { LayoutGrid, List } from 'lucide-react';
+import { LayoutGrid, List, Hourglass } from 'lucide-react';
 import { requireSesion } from '@/lib/auth';
 import StatusBadge from '@/components/StatusBadge';
 import { formatQ, formatFecha } from '@/lib/utils';
@@ -79,10 +79,13 @@ export default async function CotizacionesPage({
         }`}
       >
         <div>
-          <p className="text-sm font-bold text-amber-800">⏳ Pendientes de terminar (sin No. de cotización ERP)</p>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800">
+            <Hourglass className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+            Pendientes de terminar (sin No. de cotización ERP)
+          </p>
           <p className="text-xs text-amber-700">Borradores que aún no pueden enviarse, autorizarse ni facturarse hasta capturar el número del sistema.</p>
         </div>
-        <span className="rounded-full bg-amber-500 px-3 py-1 text-sm font-bold text-white">{pendientesFinalizar.length}</span>
+        <span className="rounded-full bg-amber-500 px-3 py-1 text-sm font-semibold text-white">{pendientesFinalizar.length}</span>
       </Link>
       {soloPendientes && (
         <p className="mb-4">
@@ -125,19 +128,19 @@ export default async function CotizacionesPage({
             return (
               <div key={estado} className="w-72 shrink-0">
                 <div className={`mb-2 flex items-center justify-between rounded-lg px-2 py-1.5 ${COLUMNA_COLOR[estado].header}`}>
-                  <p className="text-xs font-bold uppercase tracking-wide">{ESTADOS_LABEL[estado]}</p>
-                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold">{items.length}</span>
+                  <p className="text-xs font-semibold uppercase tracking-wide">{ESTADOS_LABEL[estado]}</p>
+                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold">{items.length}</span>
                 </div>
                 <div className="space-y-2">
                   {items.map((c) => (
                     <Link key={c.id} href={`/cotizaciones/${c.id}`} className={`card block !p-3 border-l-4 hover:border-navy-300 ${COLUMNA_COLOR[estado].borde}`}>
-                      <p className="text-sm font-bold text-navy-700">{c.numero_interno}</p>
+                      <p className="text-sm font-semibold text-navy-700">{c.numero_interno}</p>
                       <p className="truncate text-xs text-slate-500">{c.cliente?.nombre_razon ?? c.cliente_nombre_libre}</p>
                       <div className="mt-2 flex items-center justify-between">
                         <span className="text-sm font-semibold text-slate-700">{formatQ(c.total_cotizado)}</span>
-                        <span className="text-[11px] text-slate-400">{formatFecha(c.fecha_emision)}</span>
+                        <span className="text-xs text-slate-400">{formatFecha(c.fecha_emision)}</span>
                       </div>
-                      {verTodas && <p className="mt-1 text-[11px] text-slate-400">{c.vendedor?.nombre_completo}</p>}
+                      {verTodas && <p className="mt-1 text-xs text-slate-400">{c.vendedor?.nombre_completo}</p>}
                     </Link>
                   ))}
                   {items.length === 0 && <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-300">Vacío</p>}
