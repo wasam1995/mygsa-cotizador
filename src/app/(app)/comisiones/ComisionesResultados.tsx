@@ -329,7 +329,7 @@ function NuevaLiquidacionForm({
             <div><label className="label">Hasta</label><input type="date" className="input" value={hasta} onChange={(e) => { setHasta(e.target.value); setResultadoGrupo(null); }} /></div>
           </div>
           <div className="mt-3 rounded-lg border border-slate-200 p-3">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Vendedores incluidos</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Vendedores incluidos</p>
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
               {vendedores.map((v) => (
                 <label key={v.id} className="flex items-center gap-2 text-sm text-slate-600">
@@ -390,7 +390,7 @@ function NuevaLiquidacionForm({
 
       {pendientes !== null && pendientes.length > 0 && (
         <div className="mt-4 space-y-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Descuentos a aplicar (opcional)</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Descuentos a aplicar (opcional)</p>
 
           <div className="rounded-lg border border-slate-200 p-3">
             <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -435,7 +435,7 @@ function NuevaLiquidacionForm({
 
           <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-right">
             <p className="text-xs font-semibold uppercase text-emerald-700">Neto a pagar</p>
-            <p className="text-xl font-black text-emerald-800">{formatQ(totalNeto)}</p>
+            <p className="text-xl font-semibold text-emerald-800">{formatQ(totalNeto)}</p>
           </div>
         </div>
       )}
@@ -628,7 +628,7 @@ function EditarLiquidacionForm({
 
   return (
     <div className="space-y-3 text-sm">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         Editar descuentos de {liquidacion.numero} — base {formatQ(liquidacion.total_comisiones)}
       </p>
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -676,7 +676,7 @@ function EditarLiquidacionForm({
 
       <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-right">
         <p className="text-xs font-semibold uppercase text-emerald-700">Neto a pagar</p>
-        <p className="text-xl font-black text-emerald-800">{formatQ(totalNeto)}</p>
+        <p className="text-xl font-semibold text-emerald-800">{formatQ(totalNeto)}</p>
       </div>
 
       <div className="flex gap-2">
