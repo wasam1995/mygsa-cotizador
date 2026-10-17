@@ -301,7 +301,7 @@ export default function DetalleClient({
 
       {mostrarConfirmarEliminar && (
         <div className="card no-print border-red-200 bg-red-50">
-          <p className="text-sm font-bold text-red-700">¿Eliminar esta cotización?</p>
+          <p className="text-sm font-semibold text-red-700">¿Eliminar esta cotización?</p>
           <p className="mt-1 text-sm text-red-600">
             Esta acción no se puede deshacer y borra por completo el registro de {cotizacion.numero_interno}.
             {' '}Si solo quiere dejarla sin efecto conservando el registro, use "Anular" en vez de esto.
@@ -590,7 +590,7 @@ function Dato({ label, valor }: { label: string; valor: string }) {
 
 function FilaResumen({ label, valor, negrita, grande, tono }: { label: string; valor: number; negrita?: boolean; grande?: boolean; tono?: string }) {
   return (
-    <div className={`flex justify-between py-0.5 text-sm ${negrita ? 'font-bold text-slate-800' : 'text-slate-600'} ${grande ? 'text-base' : ''} ${tono ?? ''}`}>
+    <div className={`flex justify-between py-0.5 text-sm ${negrita ? 'font-semibold text-slate-800' : 'text-slate-600'} ${grande ? 'text-base' : ''} ${tono ?? ''}`}>
       <span>{label}</span><span>{formatQ(valor)}</span>
     </div>
   );
