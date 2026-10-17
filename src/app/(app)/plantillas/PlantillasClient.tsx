@@ -43,7 +43,7 @@ export default function PlantillasClient({ plantillas, parametros }: { plantilla
           <div key={p.id} className={`card ${!p.activo ? 'opacity-60' : ''}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <p className="font-bold text-slate-800">{p.nombre}</p>
+                <p className="font-semibold text-slate-800">{p.nombre}</p>
                 {p.es_predeterminada && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Predeterminada</span>}
                 {!p.activo && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-500">Inactiva</span>}
               </div>
@@ -222,7 +222,7 @@ function FormularioPlantilla({
                 </div>
                 <textarea className="input min-h-[60px] text-xs" placeholder="Contenido" value={a.contenido} onChange={(e) => actualizarApartado(idx, { contenido: e.target.value })} />
                 <div className="mt-1">
-                  <label className="label !mb-0.5 !text-[11px]">Dónde se imprime</label>
+                  <label className="label !mb-0.5 !text-xs">Dónde se imprime</label>
                   <select className="input !py-1 text-xs" value={a.posicion ?? 'antes_condiciones'}
                     onChange={(e) => actualizarApartado(idx, { posicion: e.target.value as PosicionApartado })}>
                     {POSICIONES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
