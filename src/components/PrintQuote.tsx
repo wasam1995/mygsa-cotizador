@@ -171,10 +171,6 @@ export default function PrintQuote({
             </View>
           );
         })}
-        {!mostrarPrecios && (
-          <Text style={s.notaSinPrecios}>Precios detallados por artículo omitidos — se muestra el precio total del paquete.</Text>
-        )}
-
         {renderApartados(apartadosPor('antes_totales'))}
 
         {/* Totales alineados a la derecha */}
@@ -271,7 +267,6 @@ function crearEstilos(pal: ReturnType<typeof paletaPdf>) {
     colPrecio: { width: 62, textAlign: 'right' },
     fotoProducto: { width: 34, height: 34, borderRadius: 3, objectFit: 'cover' },
     fotoVacia: { width: 34, height: 34, borderRadius: 3 },
-    notaSinPrecios: { marginTop: 4, textAlign: 'right', fontStyle: 'italic', color: '#94a3b8', fontSize: 8 },
     filaTotales: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
     cajaLetras: { maxWidth: 220, borderLeftWidth: 3, borderLeftColor: '#34d399', backgroundColor: '#ecfdf5', borderRadius: 6, padding: 8 },
     cajaLetrasTitulo: { fontWeight: 700, color: '#065f46', fontSize: 8 },
