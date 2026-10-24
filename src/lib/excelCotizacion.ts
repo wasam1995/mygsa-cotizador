@@ -172,10 +172,6 @@ export function construirHojaCotizacion(
   });
   const filaFinItems = filas.length;
 
-  if (!mostrarPrecios) {
-    agregar(vacia());
-    agregarAncha('Precios detallados por artículo omitidos — se muestra el precio total del paquete.');
-  }
   agregar(vacia());
 
   // --- Totales (alineados bajo la columna "Total" de la tabla de ítems) ---
